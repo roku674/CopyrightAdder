@@ -85,8 +85,8 @@ Read-Config
 function Get-GitAuthorInfo {
     param([string]$FilePath)
     
-    # Get the first commit that created this file
-    $gitLog = git log --diff-filter=A --follow --format='%an|%ae|%ad' --date=format:'%Y' -- "$FilePath" 2>$null | Select-Object -Last 1
+    # Get the first commit that created this file with full timestamp
+    $gitLog = git log --diff-filter=A --follow --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' -- "$FilePath" 2>$null | Select-Object -Last 1
     
     if ([string]::IsNullOrEmpty($gitLog)) {
         # If file not in git history yet, use current git user
@@ -97,8 +97,9 @@ function Get-GitAuthorInfo {
         if ([string]::IsNullOrEmpty($currentEmail)) { $currentEmail = "unknown@unknown.com" }
         
         $currentYear = Get-Date -Format "yyyy"
+        $currentTimestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
         
-        return "$currentAuthor|$currentEmail|$currentYear"
+        return "$currentAuthor|$currentEmail|$currentYear|$currentTimestamp"
     }
     
     return $gitLog
@@ -212,7 +213,12 @@ function Add-CopyrightHeader {
     $parts = $authorInfo -split '\|'
     $authorName = $parts[0]
     $authorEmail = $parts[1]
-    $year = $parts[2]
+    $yearAndTimestamp = $parts[2]
+    
+    # Parse year and timestamp
+    $yearTimeParts = $yearAndTimestamp -split '\|'
+    $year = $yearTimeParts[0]
+    $creationTimestamp = if ($yearTimeParts.Count -gt 1) { $yearTimeParts[1] } else { Get-Date -Format "yyyy-MM-dd HH:mm:ss" }
     
     # Format the author
     $formattedAuthor = Format-Author -AuthorName $authorName -AuthorEmail $authorEmail
@@ -232,14 +238,11 @@ function Add-CopyrightHeader {
         $formattedEditor = Format-Author -AuthorName $editorName -AuthorEmail $editorEmail
     }
     
-    # Get current timestamp
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    
-    # Build the copyright text
+    # Build the copyright text with creation timestamp from git
     if ($RightsStatement) {
-        $copyrightText = "Copyright $CompanyName, $year. $RightsStatement Created by $formattedAuthor on $timestamp"
+        $copyrightText = "Copyright $CompanyName, $year. $RightsStatement Created by $formattedAuthor on $creationTimestamp"
     } else {
-        $copyrightText = "Copyright $CompanyName, $year. All Rights Reserved. Created by $formattedAuthor on $timestamp"
+        $copyrightText = "Copyright $CompanyName, $year. All Rights Reserved. Created by $formattedAuthor on $creationTimestamp"
     }
     
     # Add edited by info if editor is different from author
@@ -387,7 +390,8 @@ function Find-SourceFiles {
             
             # Check if file is in excluded directory
             foreach ($excludeDir in $script:ExcludeDirs) {
-                if ($file.FullName -match [regex]::Escape($excludeDir)) {
+                # Check if the path contains the excluded directory at any level
+                if ($file.FullName -match "[\\/]$([regex]::Escape($excludeDir))[\\/]") {
                     $skip = $true
                     break
                 }

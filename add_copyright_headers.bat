@@ -164,7 +164,7 @@ for /l %%i in (0,1,%ext_count%) do (
             REM Check exclude directories
             for /l %%j in (0,1,%exclude_count%) do (
                 if defined EXCLUDE_DIRS[%%j] (
-                    echo %%F | findstr /i "!EXCLUDE_DIRS[%%j]!" >nul
+                    echo %%F | findstr /i "\\!EXCLUDE_DIRS[%%j]!\\" >nul
                     if not errorlevel 1 set "skip_file=1"
                 )
             )
@@ -324,7 +324,7 @@ for /l %%i in (0,1,%ext_count%) do (
             REM Check exclude directories
             for /l %%j in (0,1,%exclude_count%) do (
                 if defined EXCLUDE_DIRS[%%j] (
-                    echo %%F | findstr /i "!EXCLUDE_DIRS[%%j]!" >nul
+                    echo %%F | findstr /i "\\!EXCLUDE_DIRS[%%j]!\\" >nul
                     if not errorlevel 1 set "skip_file=1"
                 )
             )
@@ -347,9 +347,9 @@ for /l %%i in (0,1,%ext_count%) do (
 goto :eof
 
 :got_style
-REM Get author info from git
+REM Get author info from git with creation timestamp
 set "author_info="
-for /f "tokens=*" %%i in ('git log --diff-filter=A --follow --format="%%an^|%%ae^|%%ad" --date=format:"%%Y" -- "%file%" 2^>nul ^| tail -1') do set "author_info=%%i"
+for /f "tokens=*" %%i in ('git log --diff-filter=A --follow --format="%%an^|%%ae^|%%ad" --date=format:"%%Y^|%%Y-%%m-%%d %%H:%%M:%%S" -- "%file%" 2^>nul ^| tail -1') do set "author_info=%%i"
 
 if "!author_info!"=="" (
     REM If file not in git history yet, use current git user
@@ -362,14 +362,24 @@ if "!author_info!"=="" (
     for /f "tokens=*" %%i in ('date /t') do set "year=%%i"
     set "year=!year:~-4!"
     
-    set "author_info=!author_name!^|!author_email!^|!year!"
+    REM Get current timestamp for files not in git
+    for /f "tokens=2 delims==" %%a in ('wmic OS Get localdatetime /value') do set "dt=%%a"
+    set "creation_timestamp=!dt:~0,4!-!dt:~4,2!-!dt:~6,2! !dt:~8,2!:!dt:~10,2!:!dt:~12,2!"
+    
+    set "author_info=!author_name!^|!author_email!^|!year!^|!creation_timestamp!"
 )
 
 REM Parse author info
-for /f "tokens=1,2,3 delims=|" %%a in ("!author_info!") do (
+for /f "tokens=1,2,3* delims=|" %%a in ("!author_info!") do (
     set "author_name=%%a"
     set "author_email=%%b"
-    set "year=%%c"
+    set "year_and_timestamp=%%c"
+)
+
+REM Parse year and timestamp
+for /f "tokens=1,2* delims=|" %%a in ("!year_and_timestamp!") do (
+    set "year=%%a"
+    set "creation_timestamp=%%b"
 )
 
 REM Format author with special handling
@@ -396,15 +406,11 @@ if not "!editor_info!"=="" (
     call :format_author "!author_name!" "!author_email!"
 )
 
-REM Get current timestamp using WMIC for consistent format
-for /f "tokens=2 delims==" %%a in ('wmic OS Get localdatetime /value') do set "dt=%%a"
-set "timestamp=!dt:~0,4!-!dt:~4,2!-!dt:~6,2! !dt:~8,2!:!dt:~10,2!:!dt:~12,2!"
-
-REM Build the copyright text
+REM Build the copyright text with creation timestamp from git
 if not "%RIGHTS_STATEMENT%"=="" (
-    set "copyright_text=Copyright %COMPANY_NAME%, !year!. %RIGHTS_STATEMENT% Created by !formatted_author! on !timestamp!"
+    set "copyright_text=Copyright %COMPANY_NAME%, !year!. %RIGHTS_STATEMENT% Created by !formatted_author! on !creation_timestamp!"
 ) else (
-    set "copyright_text=Copyright %COMPANY_NAME%, !year!. All Rights Reserved. Created by !formatted_author! on !timestamp!"
+    set "copyright_text=Copyright %COMPANY_NAME%, !year!. All Rights Reserved. Created by !formatted_author! on !creation_timestamp!"
 )
 
 REM Add edited by info if we have editor info and it's different from author
@@ -611,7 +617,7 @@ for /l %%i in (0,1,%ext_count%) do (
             REM Check exclude directories
             for /l %%j in (0,1,%exclude_count%) do (
                 if defined EXCLUDE_DIRS[%%j] (
-                    echo %%F | findstr /i "!EXCLUDE_DIRS[%%j]!" >nul
+                    echo %%F | findstr /i "\\!EXCLUDE_DIRS[%%j]!\\" >nul
                     if not errorlevel 1 set "skip_file=1"
                 )
             )
@@ -733,7 +739,7 @@ for /l %%i in (0,1,%ext_count%) do (
             REM Check exclude directories
             for /l %%j in (0,1,%exclude_count%) do (
                 if defined EXCLUDE_DIRS[%%j] (
-                    echo %%F | findstr /i "!EXCLUDE_DIRS[%%j]!" >nul
+                    echo %%F | findstr /i "\\!EXCLUDE_DIRS[%%j]!\\" >nul
                     if not errorlevel 1 set "skip_file=1"
                 )
             )
@@ -846,7 +852,7 @@ for /l %%i in (0,1,%ext_count%) do (
             REM Check exclude directories
             for /l %%j in (0,1,%exclude_count%) do (
                 if defined EXCLUDE_DIRS[%%j] (
-                    echo %%F | findstr /i "!EXCLUDE_DIRS[%%j]!" >nul
+                    echo %%F | findstr /i "\\!EXCLUDE_DIRS[%%j]!\\" >nul
                     if not errorlevel 1 set "skip_file=1"
                 )
             )
@@ -958,7 +964,7 @@ for /l %%i in (0,1,%ext_count%) do (
             REM Check exclude directories
             for /l %%j in (0,1,%exclude_count%) do (
                 if defined EXCLUDE_DIRS[%%j] (
-                    echo %%F | findstr /i "!EXCLUDE_DIRS[%%j]!" >nul
+                    echo %%F | findstr /i "\\!EXCLUDE_DIRS[%%j]!\\" >nul
                     if not errorlevel 1 set "skip_file=1"
                 )
             )

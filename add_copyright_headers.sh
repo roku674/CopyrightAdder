@@ -1,3 +1,5 @@
+# Copyright Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-02 09:35:27
+# Edited by Alexander Fields https://www.alexanderfields.me 2025-07-02 11:17:11
 #!/bin/bash
 
 # Universal Copyright Header Script
@@ -76,15 +78,16 @@ get_git_author_info() {
     local file="$1"
     local info=""
     
-    # Get the first commit that created this file
-    info=$(git log --diff-filter=A --follow --format='%an|%ae|%ad' --date=format:'%Y' -- "$file" 2>/dev/null | tail -1)
+    # Get the first commit that created this file with full timestamp
+    info=$(git log --diff-filter=A --follow --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | tail -1)
     
     if [ -z "$info" ]; then
         # If file not in git history yet, try to get current git user
         local current_author=$(git config user.name 2>/dev/null || echo "Unknown")
         local current_email=$(git config user.email 2>/dev/null || echo "unknown@unknown.com")
         local current_year=$(date +%Y)
-        info="$current_author|$current_email|$current_year"
+        local current_timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+        info="$current_author|$current_email|$current_year|$current_timestamp"
     fi
     
     echo "$info"
@@ -160,7 +163,11 @@ add_copyright_header() {
     esac
     
     # Get author info from git
-    IFS='|' read -r author_name author_email year <<< "$(get_git_author_info "$file")"
+    local author_info=$(get_git_author_info "$file")
+    IFS='|' read -r author_name author_email year_and_timestamp <<< "$author_info"
+    
+    # Parse year and timestamp from the combined field
+    IFS='|' read -r year creation_timestamp <<< "$year_and_timestamp"
     
     # Format the author
     formatted_author=$(format_author "$author_name" "$author_email")
@@ -172,14 +179,11 @@ add_copyright_header() {
         formatted_editor=$(format_author "$editor_name" "$editor_email")
     fi
     
-    # Get current timestamp
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    
-    # Build the copyright header
+    # Build the copyright header with creation timestamp from git
     if [ -n "$RIGHTS_STATEMENT" ]; then
-        local copyright_text="Copyright $COMPANY_NAME, $year. $RIGHTS_STATEMENT Created by $formatted_author on $timestamp"
+        local copyright_text="Copyright $COMPANY_NAME, $year. $RIGHTS_STATEMENT Created by $formatted_author on $creation_timestamp"
     else
-        local copyright_text="Copyright $COMPANY_NAME, $year. All Rights Reserved. Created by $formatted_author on $timestamp"
+        local copyright_text="Copyright $COMPANY_NAME, $year. All Rights Reserved. Created by $formatted_author on $creation_timestamp"
     fi
     
     # Add edited by info if editor is different from author
@@ -292,7 +296,7 @@ find_source_files() {
     # Build find command with exclusions from config
     local find_cmd="find . -type f"
     for dir in "${EXCLUDE_DIRS[@]}"; do
-        find_cmd="$find_cmd -not -path './$dir/*'"
+        find_cmd="$find_cmd -not -path '*/$dir/*' -not -name '$dir'"
     done
     
     # Add file extensions to search for from config
