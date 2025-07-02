@@ -183,6 +183,9 @@ function Get-CommentStyle {
         "clj" = @{ Start = ";;"; End = "" }
         "scm" = @{ Start = ";;"; End = "" }
         "el" = @{ Start = ";;"; End = "" }
+        
+        # JSON - special handling
+        "json" = @{ Start = "json_special"; End = "" }
     }
     
     return $commentStyles[$extension.ToLower()]
@@ -229,64 +232,133 @@ function Add-CopyrightHeader {
         $formattedEditor = Format-Author -AuthorName $editorName -AuthorEmail $editorEmail
     }
     
-    # Build the copyright header
+    # Build the copyright text
     if ($RightsStatement) {
-        $header = "$($commentStyle.Start) Copyright $CompanyName, $year. $RightsStatement Created by $formattedAuthor$($commentStyle.End)"
+        $copyrightText = "Copyright $CompanyName, $year. $RightsStatement Created by $formattedAuthor"
     } else {
-        $header = "$($commentStyle.Start) Copyright $CompanyName, $year. All Rights Reserved. Created by $formattedAuthor$($commentStyle.End)"
+        $copyrightText = "Copyright $CompanyName, $year. All Rights Reserved. Created by $formattedAuthor"
     }
     
-    # Add edited by line if editor is different from author
-    $headers = @($header)
+    # Add edited by info if editor is different from author
+    $editedText = ""
     if ($editorEmail -and $editorEmail -ne $authorEmail) {
-        $headers += "$($commentStyle.Start) Edited by $formattedEditor $editorDate$($commentStyle.End)"
+        $editedText = "Edited by $formattedEditor $editorDate"
     }
     
-    # Read file content
-    $content = Get-Content -Path $FilePath -Raw -ErrorAction SilentlyContinue
-    if (-not $content) {
-        $content = ""
-    }
-    
-    # Get first 10 lines to check for existing copyright
-    $lines = $content -split "`r?`n"
-    $first10Lines = $lines | Select-Object -First 10
-    
-    $hasCopyright = $false
-    foreach ($line in $first10Lines) {
-        if ($line -match "Copyright.*$([regex]::Escape($CompanyName))") {
-            $hasCopyright = $true
-            break
-        }
-    }
-    
-    if ($hasCopyright) {
-        Write-Host "File already has copyright header, updating: $FilePath"
+    # Handle JSON files specially
+    if ($commentStyle.Start -eq "json_special") {
+        # For JSON files, we need to add/update the "copyright" key
+        $content = Get-Content -Path $FilePath -Raw -ErrorAction SilentlyContinue
         
-        # Remove old copyright and edited by lines
-        $newLines = @()
-        $lineCount = 0
-        
-        foreach ($line in $lines) {
-            $lineCount++
-            if ($lineCount -le 15) {
-                if ($line -match "Copyright" -or $line -match "Edited by") {
-                    # Skip old copyright and edited by lines
-                    continue
+        if ($content) {
+            try {
+                $json = $content | ConvertFrom-Json
+                $copyrightValue = $copyrightText
+                if ($editedText) {
+                    $copyrightValue += ", $editedText"
+                }
+                
+                # Add or update copyright property
+                if ($json.PSObject.Properties.Name -contains "copyright") {
+                    Write-Host "File already has copyright key, updating: $FilePath"
+                } else {
+                    Write-Host "Adding copyright key to JSON: $FilePath"
+                }
+                
+                $json | Add-Member -MemberType NoteProperty -Name "copyright" -Value $copyrightValue -Force
+                
+                # Convert back to JSON and save
+                $newContent = $json | ConvertTo-Json -Depth 100
+                Set-Content -Path $FilePath -Value $newContent -NoNewline
+            } catch {
+                # If JSON parsing fails, try simple string manipulation
+                if ($content -match '"copyright"\s*:\s*"[^"]*"') {
+                    Write-Host "File already has copyright key, updating: $FilePath"
+                    $copyrightValue = $copyrightText
+                    if ($editedText) {
+                        $copyrightValue += ", $editedText"
+                    }
+                    $newContent = $content -replace '"copyright"\s*:\s*"[^"]*"', "`"copyright`": `"$copyrightValue`""
+                    Set-Content -Path $FilePath -Value $newContent -NoNewline
+                } else {
+                    Write-Host "Adding copyright key to JSON: $FilePath"
+                    # Try to add after opening brace
+                    if ($content -match '^\s*\{') {
+                        $copyrightValue = $copyrightText
+                        if ($editedText) {
+                            $copyrightValue += ", $editedText"
+                        }
+                        $newContent = $content -replace '^\s*\{', "{`r`n  `"copyright`": `"$copyrightValue`","
+                        Set-Content -Path $FilePath -Value $newContent -NoNewline
+                    } else {
+                        Write-Host "Warning: Could not parse JSON structure in $FilePath"
+                        return
+                    }
                 }
             }
-            $newLines += $line
+        } else {
+            # Empty or new JSON file
+            $copyrightValue = $copyrightText
+            if ($editedText) {
+                $copyrightValue += ", $editedText"
+            }
+            $newContent = @{copyright = $copyrightValue} | ConvertTo-Json
+            Set-Content -Path $FilePath -Value $newContent -NoNewline
+        }
+    } else {
+        # Non-JSON files - use comment-based headers
+        $header = "$($commentStyle.Start) $copyrightText$($commentStyle.End)"
+        $headers = @($header)
+        if ($editedText) {
+            $headers += "$($commentStyle.Start) $editedText$($commentStyle.End)"
         }
         
-        # Add new headers at the beginning
-        $newContent = ($headers -join "`r`n") + "`r`n" + ($newLines -join "`r`n")
-    } else {
-        # Add new copyright headers at the beginning
-        $newContent = ($headers -join "`r`n") + "`r`n" + $content
+        # Read file content
+        $content = Get-Content -Path $FilePath -Raw -ErrorAction SilentlyContinue
+        if (-not $content) {
+            $content = ""
+        }
+        
+        # Get first 10 lines to check for existing copyright
+        $lines = $content -split "`r?`n"
+        $first10Lines = $lines | Select-Object -First 10
+        
+        $hasCopyright = $false
+        foreach ($line in $first10Lines) {
+            if ($line -match "Copyright.*$([regex]::Escape($CompanyName))") {
+                $hasCopyright = $true
+                break
+            }
+        }
+        
+        if ($hasCopyright) {
+            Write-Host "File already has copyright header, updating: $FilePath"
+            
+            # Remove old copyright and edited by lines
+            $newLines = @()
+            $lineCount = 0
+            
+            foreach ($line in $lines) {
+                $lineCount++
+                if ($lineCount -le 15) {
+                    if ($line -match "Copyright" -or $line -match "Edited by") {
+                        # Skip old copyright and edited by lines
+                        continue
+                    }
+                }
+                $newLines += $line
+            }
+            
+            # Add new headers at the beginning
+            $newContent = ($headers -join "`r`n") + "`r`n" + ($newLines -join "`r`n")
+        } else {
+            # Add new copyright headers at the beginning
+            $newContent = ($headers -join "`r`n") + "`r`n" + $content
+        }
+        
+        # Write back to file
+        Set-Content -Path $FilePath -Value $newContent -NoNewline
     }
-    
-    # Write back to file
-    Set-Content -Path $FilePath -Value $newContent -NoNewline
     
     Write-Host "Processed: $FilePath (Author: $formattedAuthor, Year: $year)"
 }

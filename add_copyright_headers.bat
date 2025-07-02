@@ -185,6 +185,12 @@ if not errorlevel 1 (
     goto :got_style
 )
 
+REM JSON style
+if /i "!ext!"=="json" (
+    set "comment_style=json_special"
+    goto :got_style
+)
+
 REM Unknown file type
 echo Skipping unknown file type: %file%
 goto :eof
@@ -344,76 +350,148 @@ if not "!editor_info!"=="" (
     call :format_author "!author_name!" "!author_email!"
 )
 
-REM Build the copyright header
+REM Build the copyright text
 if not "%RIGHTS_STATEMENT%"=="" (
-    set "header=!comment_style! Copyright %COMPANY_NAME%, !year!. %RIGHTS_STATEMENT% Created by !formatted_author!!comment_end!"
+    set "copyright_text=Copyright %COMPANY_NAME%, !year!. %RIGHTS_STATEMENT% Created by !formatted_author!"
 ) else (
-    set "header=!comment_style! Copyright %COMPANY_NAME%, !year!. All Rights Reserved. Created by !formatted_author!!comment_end!"
+    set "copyright_text=Copyright %COMPANY_NAME%, !year!. All Rights Reserved. Created by !formatted_author!"
 )
 
-REM Add edited by line if we have editor info and it's different from author
-set "header2="
+REM Add edited by info if we have editor info and it's different from author
+set "edited_text="
 if not "!editor_info!"=="" (
     if not "!author_email!"=="!editor_email!" (
-        set "header2=!comment_style! Edited by !editor_name! !editor_date!!comment_end!"
+        set "edited_text=Edited by !editor_name! !editor_date!"
     )
 )
 
-REM Check if file already has a copyright header in the first 10 lines
-set "has_copyright=0"
-set "line_count=0"
-for /f "tokens=*" %%i in ('type "%file%" 2^>nul') do (
-    set /a line_count+=1
-    if !line_count! leq 10 (
-        echo %%i | findstr /c:"Copyright.*%COMPANY_NAME%" >nul
-        if not errorlevel 1 set "has_copyright=1"
+REM Handle JSON files specially
+if "!comment_style!"=="json_special" (
+    REM For JSON files, add/update copyright key
+    set "has_copyright=0"
+    
+    REM Check if file has copyright key
+    findstr /c:"\"copyright\"" "%file%" >nul 2>&1
+    if not errorlevel 1 set "has_copyright=1"
+    
+    set "temp_file=%TEMP%\copyright_temp_%RANDOM%.tmp"
+    
+    REM Combine copyright and edited text
+    set "copyright_value=!copyright_text!"
+    if not "!edited_text!"=="" (
+        set "copyright_value=!copyright_value!, !edited_text!"
     )
-)
-
-REM Create temp file
-set "temp_file=%TEMP%\copyright_temp_%RANDOM%.tmp"
-
-if !has_copyright!==1 (
-    echo File already has copyright header, updating: %file%
     
-    REM Remove old copyright and edited lines and add new ones
-    set "line_count=0"
-    set "skip_line=0"
-    
-    REM Write the new headers
-    echo !header!> "!temp_file!"
-    if not "!header2!"=="" echo !header2!>> "!temp_file!"
-    
-    for /f "delims=" %%i in ('type "%file%"') do (
-        set /a line_count+=1
-        set "current_line=%%i"
-        set "skip_line=0"
-        
-        if !line_count! leq 15 (
-            REM Skip copyright lines
-            echo %%i | findstr /c:"Copyright" >nul
-            if not errorlevel 1 set "skip_line=1"
-            
-            REM Skip edited by lines
-            echo %%i | findstr /c:"Edited by" >nul
-            if not errorlevel 1 set "skip_line=1"
-            
-            if !skip_line!==0 (
+    if !has_copyright!==1 (
+        echo File already has copyright key, updating: %file%
+        REM Update existing copyright value using simple replacement
+        powershell -Command "(Get-Content '%file%') -replace '\"copyright\"\s*:\s*\"[^\"]*\"', '\"copyright\": \"!copyright_value!\"' | Set-Content '!temp_file!'" 2>nul
+        if errorlevel 1 (
+            REM Fallback to batch processing
+            for /f "delims=" %%i in ('type "%file%"') do (
+                set "line=%%i"
+                echo !line! | findstr /c:"\"copyright\"" >nul
+                if not errorlevel 1 (
+                    echo   "copyright": "!copyright_value!",>> "!temp_file!"
+                ) else (
+                    echo %%i>> "!temp_file!"
+                )
+            )
+        )
+    ) else (
+        echo Adding copyright key to JSON: %file%
+        REM Add copyright key after opening brace
+        set "first_line_done=0"
+        for /f "delims=" %%i in ('type "%file%" 2^>nul') do (
+            set "line=%%i"
+            if !first_line_done!==0 (
+                echo !line! | findstr /c:"{" >nul
+                if not errorlevel 1 (
+                    echo {> "!temp_file!"
+                    echo   "copyright": "!copyright_value!",>> "!temp_file!"
+                    set "first_line_done=1"
+                ) else (
+                    echo %%i>> "!temp_file!"
+                )
+            ) else (
                 echo %%i>> "!temp_file!"
             )
-        ) else (
-            echo %%i>> "!temp_file!"
+        )
+        
+        REM If file was empty or new
+        if !first_line_done!==0 (
+            echo {> "!temp_file!"
+            echo   "copyright": "!copyright_value!">> "!temp_file!"
+            echo }>> "!temp_file!"
         )
     )
+    
+    REM Replace original file
+    move /y "!temp_file!" "%file%" >nul
 ) else (
-    REM Add new copyright header at the beginning
-    echo !header!> "!temp_file!"
-    if not "!header2!"=="" echo !header2!>> "!temp_file!"
-    type "%file%" >> "!temp_file!" 2>nul
+    REM Non-JSON files - use comment headers
+    set "header=!comment_style! !copyright_text!!comment_end!"
+    set "header2="
+    if not "!edited_text!"=="" (
+        set "header2=!comment_style! !edited_text!!comment_end!"
+    )
+    
+    REM Check if file already has a copyright header in the first 10 lines
+    set "has_copyright=0"
+    set "line_count=0"
+    for /f "tokens=*" %%i in ('type "%file%" 2^>nul') do (
+        set /a line_count+=1
+        if !line_count! leq 10 (
+            echo %%i | findstr /c:"Copyright.*%COMPANY_NAME%" >nul
+            if not errorlevel 1 set "has_copyright=1"
+        )
+    )
+    
+    REM Create temp file
+    set "temp_file=%TEMP%\copyright_temp_%RANDOM%.tmp"
+    
+    if !has_copyright!==1 (
+        echo File already has copyright header, updating: %file%
+        
+        REM Remove old copyright and edited lines and add new ones
+        set "line_count=0"
+        set "skip_line=0"
+        
+        REM Write the new headers
+        echo !header!> "!temp_file!"
+        if not "!header2!"=="" echo !header2!>> "!temp_file!"
+        
+        for /f "delims=" %%i in ('type "%file%"') do (
+            set /a line_count+=1
+            set "current_line=%%i"
+            set "skip_line=0"
+            
+            if !line_count! leq 15 (
+                REM Skip copyright lines
+                echo %%i | findstr /c:"Copyright" >nul
+                if not errorlevel 1 set "skip_line=1"
+                
+                REM Skip edited by lines
+                echo %%i | findstr /c:"Edited by" >nul
+                if not errorlevel 1 set "skip_line=1"
+                
+                if !skip_line!==0 (
+                    echo %%i>> "!temp_file!"
+                )
+            ) else (
+                echo %%i>> "!temp_file!"
+            )
+        )
+    ) else (
+        REM Add new copyright header at the beginning
+        echo !header!> "!temp_file!"
+        if not "!header2!"=="" echo !header2!>> "!temp_file!"
+        type "%file%" >> "!temp_file!" 2>nul
+    )
+    
+    REM Replace original file
+    move /y "!temp_file!" "%file%" >nul
 )
-
-REM Replace original file
-move /y "!temp_file!" "%file%" >nul
 
 echo Processed: %file% ^(Author: !formatted_author!, Year: !year!^)
 goto :eof

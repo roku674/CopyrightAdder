@@ -7,6 +7,7 @@ A reusable script that automatically adds copyright headers to source files base
 - **Automatic Author Detection**: Uses `git log` to find who created each file
 - **Year Detection**: Gets the year from the first commit of each file
 - **Multiple Language Support**: Supports 30+ programming languages with appropriate comment styles
+- **JSON Support**: Adds copyright as a JSON property for .json files
 - **Special Author Handling**: Can add website/contact info for specific authors
 - **Smart Updates**: Updates existing copyright headers without duplicating
 - **Exclusion Patterns**: Automatically excludes build artifacts, dependencies, and generated files
@@ -145,6 +146,7 @@ FILE_EXT_35=lisp
 FILE_EXT_36=clj
 FILE_EXT_37=scm
 FILE_EXT_38=el
+FILE_EXT_39=json
 ```
 
 ### Configuration Options
@@ -174,6 +176,7 @@ The scripts automatically detect the appropriate comment style based on file ext
 | XML (`<!-- -->`) | .xml, .html, .htm, .svg |
 | SQL (`--`) | .sql |
 | Lisp (`;;`) | .lisp, .clj, .scm, .el |
+| JSON (`"copyright": "..."`) | .json |
 
 ## Examples
 
@@ -195,6 +198,24 @@ The scripts automatically detect the appropriate comment style based on file ext
 ### Full Example with Rights Statement
 ```
 //Copyright Perilous Games, Ltd., 2024. All Rights Reserved, Written by Alexander Fields https://www.alexanderfields.me
+```
+
+### JSON File Example
+For JSON files, the copyright is added as a property:
+```json
+{
+  "copyright": "Copyright MyCompany, 2024. All Rights Reserved. Created by John Doe",
+  "name": "my-project",
+  "version": "1.0.0"
+}
+```
+
+With edited by info:
+```json
+{
+  "copyright": "Copyright MyCompany, 2024. All Rights Reserved. Created by John Doe, Edited by Jane Smith 2024-01-15 10:30:00",
+  "data": {}
+}
 ```
 
 ## How It Works

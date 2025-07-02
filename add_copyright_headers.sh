@@ -148,6 +148,10 @@ add_copyright_header() {
         lisp|clj|scm|el)
             comment_style=";;"
             ;;
+        # JSON style - special handling
+        json)
+            comment_style="json_special"
+            ;;
         # Skip unknown types
         *)
             echo "Skipping unknown file type: $file"
@@ -170,45 +174,111 @@ add_copyright_header() {
     
     # Build the copyright header
     if [ -n "$RIGHTS_STATEMENT" ]; then
-        local header="${comment_style} Copyright $COMPANY_NAME, $year. $RIGHTS_STATEMENT Created by $formatted_author${comment_end}"
+        local copyright_text="Copyright $COMPANY_NAME, $year. $RIGHTS_STATEMENT Created by $formatted_author"
     else
-        local header="${comment_style} Copyright $COMPANY_NAME, $year. All Rights Reserved. Created by $formatted_author${comment_end}"
+        local copyright_text="Copyright $COMPANY_NAME, $year. All Rights Reserved. Created by $formatted_author"
     fi
     
-    # Add edited by line if editor is different from author
-    local header2=""
+    # Add edited by info if editor is different from author
+    local edited_text=""
     if [ -n "$editor_email" ] && [ "$editor_email" != "$author_email" ]; then
-        header2="${comment_style} Edited by $formatted_editor $editor_date${comment_end}"
+        edited_text="Edited by $formatted_editor $editor_date"
     fi
     
-    # Check if file already has a copyright header in the first 10 lines
-    if head -n 10 "$file" | grep -q "Copyright.*$COMPANY_NAME"; then
-        echo "File already has copyright header, updating: $file"
-        # Create temp file without old copyright and edited by lines
-        temp_file=$(mktemp)
-        awk '
-            BEGIN {line_count=0} 
-            {line_count++}
-            line_count <= 15 && ($0 ~ /Copyright/ || $0 ~ /Edited by/) {next}
-            {print}
-        ' "$file" > "$temp_file"
-        
-        # Add new headers and rest of file
-        echo "$header" > "$file"
-        if [ -n "$header2" ]; then
-            echo "$header2" >> "$file"
+    # Handle JSON files specially
+    if [ "$comment_style" = "json_special" ]; then
+        # For JSON files, we need to add/update the "copyright" key
+        if [ -f "$file" ] && [ -s "$file" ]; then
+            # Check if file already has copyright key
+            if grep -q '"copyright"' "$file"; then
+                echo "File already has copyright key, updating: $file"
+                # Update existing copyright value
+                temp_file=$(mktemp)
+                if [ -n "$edited_text" ]; then
+                    jq --arg copyright "$copyright_text" --arg edited "$edited_text" \
+                        '.copyright = ($copyright + ", " + $edited)' "$file" > "$temp_file" 2>/dev/null || {
+                        # If jq fails, try simple sed replacement
+                        sed -E "s/\"copyright\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"copyright\": \"$copyright_text, $edited_text\"/" "$file" > "$temp_file"
+                    }
+                else
+                    jq --arg copyright "$copyright_text" \
+                        '.copyright = $copyright' "$file" > "$temp_file" 2>/dev/null || {
+                        # If jq fails, try simple sed replacement
+                        sed -E "s/\"copyright\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"copyright\": \"$copyright_text\"/" "$file" > "$temp_file"
+                    }
+                fi
+                mv "$temp_file" "$file"
+            else
+                echo "Adding copyright key to JSON: $file"
+                # Add copyright key to JSON
+                temp_file=$(mktemp)
+                if [ -n "$edited_text" ]; then
+                    copyright_value="$copyright_text, $edited_text"
+                else
+                    copyright_value="$copyright_text"
+                fi
+                
+                # Try to add copyright as first key using jq
+                jq --arg copyright "$copyright_value" '. = {copyright: $copyright} + .' "$file" > "$temp_file" 2>/dev/null || {
+                    # If jq is not available or fails, do simple string manipulation
+                    # Read first line
+                    first_line=$(head -n 1 "$file")
+                    if [[ "$first_line" == "{"* ]]; then
+                        # Add copyright after opening brace
+                        echo "{" > "$temp_file"
+                        echo "  \"copyright\": \"$copyright_value\"," >> "$temp_file"
+                        tail -n +2 "$file" | sed '1s/^/  /' >> "$temp_file"
+                    else
+                        # Couldn't parse, skip
+                        echo "Warning: Could not parse JSON structure in $file"
+                        return
+                    fi
+                }
+                mv "$temp_file" "$file"
+            fi
+        else
+            # Empty or new JSON file
+            echo "{" > "$file"
+            echo "  \"copyright\": \"$copyright_text\"" >> "$file"
+            echo "}" >> "$file"
         fi
-        cat "$temp_file" >> "$file"
-        rm "$temp_file"
     else
-        # Add new copyright headers at the beginning
-        temp_file=$(mktemp)
-        echo "$header" > "$temp_file"
-        if [ -n "$header2" ]; then
-            echo "$header2" >> "$temp_file"
+        # Non-JSON files - use comment-based headers
+        local header="${comment_style} $copyright_text${comment_end}"
+        local header2=""
+        if [ -n "$edited_text" ]; then
+            header2="${comment_style} $edited_text${comment_end}"
         fi
-        cat "$file" >> "$temp_file"
-        mv "$temp_file" "$file"
+        
+        # Check if file already has a copyright header in the first 10 lines
+        if head -n 10 "$file" | grep -q "Copyright.*$COMPANY_NAME"; then
+            echo "File already has copyright header, updating: $file"
+            # Create temp file without old copyright and edited by lines
+            temp_file=$(mktemp)
+            awk '
+                BEGIN {line_count=0} 
+                {line_count++}
+                line_count <= 15 && ($0 ~ /Copyright/ || $0 ~ /Edited by/) {next}
+                {print}
+            ' "$file" > "$temp_file"
+            
+            # Add new headers and rest of file
+            echo "$header" > "$file"
+            if [ -n "$header2" ]; then
+                echo "$header2" >> "$file"
+            fi
+            cat "$temp_file" >> "$file"
+            rm "$temp_file"
+        else
+            # Add new copyright headers at the beginning
+            temp_file=$(mktemp)
+            echo "$header" > "$temp_file"
+            if [ -n "$header2" ]; then
+                echo "$header2" >> "$temp_file"
+            fi
+            cat "$file" >> "$temp_file"
+            mv "$temp_file" "$file"
+        fi
     fi
     
     echo "Processed: $file (Author: $formatted_author, Year: $year)"
