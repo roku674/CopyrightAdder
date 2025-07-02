@@ -15,12 +15,12 @@ A reusable bash script that automatically adds copyright headers to source files
 
 ### Basic Usage
 ```bash
-./add_copyright_headers_proper.sh
+./add_copyright_headers.sh
 ```
 
 ### With Custom Company Name
 ```bash
-COMPANY_NAME="MyCompany" ./add_copyright_headers_proper.sh
+COMPANY_NAME="MyCompany" ./add_copyright_headers.sh
 ```
 
 ## Configuration
