@@ -232,11 +232,14 @@ function Add-CopyrightHeader {
         $formattedEditor = Format-Author -AuthorName $editorName -AuthorEmail $editorEmail
     }
     
+    # Get current timestamp
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    
     # Build the copyright text
     if ($RightsStatement) {
-        $copyrightText = "Copyright $CompanyName, $year. $RightsStatement Created by $formattedAuthor"
+        $copyrightText = "Copyright $CompanyName, $year. $RightsStatement Created by $formattedAuthor on $timestamp"
     } else {
-        $copyrightText = "Copyright $CompanyName, $year. All Rights Reserved. Created by $formattedAuthor"
+        $copyrightText = "Copyright $CompanyName, $year. All Rights Reserved. Created by $formattedAuthor on $timestamp"
     }
     
     # Add edited by info if editor is different from author
@@ -269,7 +272,8 @@ function Add-CopyrightHeader {
                 
                 # Convert back to JSON and save
                 $newContent = $json | ConvertTo-Json -Depth 100
-                Set-Content -Path $FilePath -Value $newContent -NoNewline
+                # Ensure proper UTF-8 encoding without BOM
+                Set-Content -Path $FilePath -Value $newContent -NoNewline -Encoding UTF8
             } catch {
                 # If JSON parsing fails, try simple string manipulation
                 if ($content -match '"copyright"\s*:\s*"[^"]*"') {
@@ -279,7 +283,7 @@ function Add-CopyrightHeader {
                         $copyrightValue += ", $editedText"
                     }
                     $newContent = $content -replace '"copyright"\s*:\s*"[^"]*"', "`"copyright`": `"$copyrightValue`""
-                    Set-Content -Path $FilePath -Value $newContent -NoNewline
+                    Set-Content -Path $FilePath -Value $newContent -NoNewline -Encoding UTF8
                 } else {
                     Write-Host "Adding copyright key to JSON: $FilePath"
                     # Try to add after opening brace
@@ -289,7 +293,7 @@ function Add-CopyrightHeader {
                             $copyrightValue += ", $editedText"
                         }
                         $newContent = $content -replace '^\s*\{', "{`r`n  `"copyright`": `"$copyrightValue`","
-                        Set-Content -Path $FilePath -Value $newContent -NoNewline
+                        Set-Content -Path $FilePath -Value $newContent -NoNewline -Encoding UTF8
                     } else {
                         Write-Host "Warning: Could not parse JSON structure in $FilePath"
                         return
@@ -303,7 +307,7 @@ function Add-CopyrightHeader {
                 $copyrightValue += ", $editedText"
             }
             $newContent = @{copyright = $copyrightValue} | ConvertTo-Json
-            Set-Content -Path $FilePath -Value $newContent -NoNewline
+            Set-Content -Path $FilePath -Value $newContent -NoNewline -Encoding UTF8
         }
     } else {
         # Non-JSON files - use comment-based headers
@@ -357,7 +361,7 @@ function Add-CopyrightHeader {
         }
         
         # Write back to file
-        Set-Content -Path $FilePath -Value $newContent -NoNewline
+        Set-Content -Path $FilePath -Value $newContent -NoNewline -Encoding UTF8
     }
     
     Write-Host "Processed: $FilePath (Author: $formattedAuthor, Year: $year)"

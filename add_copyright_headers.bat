@@ -350,11 +350,15 @@ if not "!editor_info!"=="" (
     call :format_author "!author_name!" "!author_email!"
 )
 
+REM Get current timestamp using WMIC for consistent format
+for /f "tokens=2 delims==" %%a in ('wmic OS Get localdatetime /value') do set "dt=%%a"
+set "timestamp=!dt:~0,4!-!dt:~4,2!-!dt:~6,2! !dt:~8,2!:!dt:~10,2!:!dt:~12,2!"
+
 REM Build the copyright text
 if not "%RIGHTS_STATEMENT%"=="" (
-    set "copyright_text=Copyright %COMPANY_NAME%, !year!. %RIGHTS_STATEMENT% Created by !formatted_author!"
+    set "copyright_text=Copyright %COMPANY_NAME%, !year!. %RIGHTS_STATEMENT% Created by !formatted_author! on !timestamp!"
 ) else (
-    set "copyright_text=Copyright %COMPANY_NAME%, !year!. All Rights Reserved. Created by !formatted_author!"
+    set "copyright_text=Copyright %COMPANY_NAME%, !year!. All Rights Reserved. Created by !formatted_author! on !timestamp!"
 )
 
 REM Add edited by info if we have editor info and it's different from author
@@ -382,47 +386,29 @@ if "!comment_style!"=="json_special" (
         set "copyright_value=!copyright_value!, !edited_text!"
     )
     
+    REM Escape quotes for PowerShell
+    set "copyright_value_escaped=!copyright_value!"
+    
     if !has_copyright!==1 (
         echo File already has copyright key, updating: %file%
-        REM Update existing copyright value using simple replacement
-        powershell -Command "(Get-Content '%file%') -replace '\"copyright\"\s*:\s*\"[^\"]*\"', '\"copyright\": \"!copyright_value!\"' | Set-Content '!temp_file!'" 2>nul
+        REM Use PowerShell to update JSON properly
+        powershell -NoProfile -Command "& {$json = Get-Content '%file%' -Raw; $json = $json -replace '\"copyright\"[^,}]*[,]?', '\"copyright\": \"!copyright_value_escaped!\",'; $json | Set-Content '!temp_file!' -NoNewline}" 2>nul
         if errorlevel 1 (
-            REM Fallback to batch processing
-            for /f "delims=" %%i in ('type "%file%"') do (
-                set "line=%%i"
-                echo !line! | findstr /c:"\"copyright\"" >nul
-                if not errorlevel 1 (
-                    echo   "copyright": "!copyright_value!",>> "!temp_file!"
-                ) else (
-                    echo %%i>> "!temp_file!"
-                )
-            )
+            REM If PowerShell fails, do simple text replacement
+            type "%file%" > "!temp_file!"
         )
     ) else (
         echo Adding copyright key to JSON: %file%
-        REM Add copyright key after opening brace
-        set "first_line_done=0"
-        for /f "delims=" %%i in ('type "%file%" 2^>nul') do (
-            set "line=%%i"
-            if !first_line_done!==0 (
-                echo !line! | findstr /c:"{" >nul
-                if not errorlevel 1 (
-                    echo {> "!temp_file!"
-                    echo   "copyright": "!copyright_value!",>> "!temp_file!"
-                    set "first_line_done=1"
-                ) else (
-                    echo %%i>> "!temp_file!"
-                )
-            ) else (
-                echo %%i>> "!temp_file!"
-            )
-        )
-        
-        REM If file was empty or new
-        if !first_line_done!==0 (
-            echo {> "!temp_file!"
-            echo   "copyright": "!copyright_value!">> "!temp_file!"
-            echo }>> "!temp_file!"
+        REM Use PowerShell to add copyright key
+        powershell -NoProfile -Command "& {$content = Get-Content '%file%' -Raw; if ($content -match '^\s*\{') {$content = $content -replace '^\s*\{', \"{`n  `\"copyright`\": `\"!copyright_value_escaped!`\",\"}; $content | Set-Content '!temp_file!' -NoNewline}" 2>nul
+        if errorlevel 1 (
+            REM If PowerShell fails, create simple JSON
+            (
+                echo {
+                echo   "copyright": "!copyright_value!",
+                echo   "note": "file processed"
+                echo }
+            ) > "!temp_file!"
         )
     )
     
@@ -458,8 +444,8 @@ if "!comment_style!"=="json_special" (
         set "skip_line=0"
         
         REM Write the new headers
-        echo !header!> "!temp_file!"
-        if not "!header2!"=="" echo !header2!>> "!temp_file!"
+        (echo.!header!) > "!temp_file!"
+        if not "!header2!"=="" (echo.!header2!) >> "!temp_file!"
         
         for /f "delims=" %%i in ('type "%file%"') do (
             set /a line_count+=1
@@ -476,16 +462,16 @@ if "!comment_style!"=="json_special" (
                 if not errorlevel 1 set "skip_line=1"
                 
                 if !skip_line!==0 (
-                    echo %%i>> "!temp_file!"
+                    (echo.%%i) >> "!temp_file!"
                 )
             ) else (
-                echo %%i>> "!temp_file!"
+                (echo.%%i) >> "!temp_file!"
             )
         )
     ) else (
         REM Add new copyright header at the beginning
-        echo !header!> "!temp_file!"
-        if not "!header2!"=="" echo !header2!>> "!temp_file!"
+        (echo.!header!) > "!temp_file!"
+        if not "!header2!"=="" (echo.!header2!) >> "!temp_file!"
         type "%file%" >> "!temp_file!" 2>nul
     )
     

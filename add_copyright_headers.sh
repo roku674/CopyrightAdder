@@ -172,11 +172,14 @@ add_copyright_header() {
         formatted_editor=$(format_author "$editor_name" "$editor_email")
     fi
     
+    # Get current timestamp
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    
     # Build the copyright header
     if [ -n "$RIGHTS_STATEMENT" ]; then
-        local copyright_text="Copyright $COMPANY_NAME, $year. $RIGHTS_STATEMENT Created by $formatted_author"
+        local copyright_text="Copyright $COMPANY_NAME, $year. $RIGHTS_STATEMENT Created by $formatted_author on $timestamp"
     else
-        local copyright_text="Copyright $COMPANY_NAME, $year. All Rights Reserved. Created by $formatted_author"
+        local copyright_text="Copyright $COMPANY_NAME, $year. All Rights Reserved. Created by $formatted_author on $timestamp"
     fi
     
     # Add edited by info if editor is different from author
