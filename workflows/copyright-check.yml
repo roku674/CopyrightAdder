@@ -1,5 +1,4 @@
 # Copyright © Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-02 16:19:48
-name: Copyright Header Check
 
 on:
   pull_request:

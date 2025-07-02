@@ -1,7 +1,6 @@
 # Copyright © Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-02 16:19:48
 #!/bin/bash
 # Run copyright header check locally
-# Usage: ./CopyrightAdder/check-copyright.sh
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
