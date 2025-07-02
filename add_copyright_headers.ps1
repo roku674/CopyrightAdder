@@ -412,17 +412,11 @@ function Find-SourceFiles {
     return $files
 }
 
-# Main execution
-function Main {
-    # Check if we're in a git repository
-    try {
-        git rev-parse --git-dir | Out-Null
-    } catch {
-        Write-Host "Error: Not in a git repository!" -ForegroundColor Red
-        exit 1
-    }
+# Function to process a single git repository
+function Process-SingleRepo {
+    param([string]$RepoPath)
     
-    Write-Host "Adding copyright headers based on git history..."
+    Write-Host "Processing repository: $RepoPath"
     Write-Host "Company: $CompanyName"
     if ($RightsStatement) {
         Write-Host "Rights: $RightsStatement"
@@ -437,7 +431,71 @@ function Main {
     }
     
     Write-Host ""
-    Write-Host "Copyright headers added successfully!" -ForegroundColor Green
+    Write-Host "Copyright headers added successfully for $RepoPath!" -ForegroundColor Green
+    Write-Host ""
+}
+
+# Function to find all git repositories recursively
+function Find-GitRepos {
+    param([string]$SearchPath = ".")
+    
+    Get-ChildItem -Path $SearchPath -Directory -Recurse -Force -ErrorAction SilentlyContinue |
+        Where-Object { Test-Path (Join-Path $_.FullName ".git") } |
+        Select-Object -ExpandProperty FullName
+}
+
+# Main execution
+function Main {
+    # Check if we're in a git repository
+    $inGitRepo = $false
+    try {
+        git rev-parse --git-dir 2>&1 | Out-Null
+        $inGitRepo = $true
+    } catch {
+        $inGitRepo = $false
+    }
+    
+    if ($inGitRepo) {
+        # Single repository mode
+        Write-Host "Adding copyright headers based on git history..."
+        Process-SingleRepo -RepoPath (Get-Location).Path
+    } else {
+        # Multi-repository mode
+        Write-Host "Not in a git repository. Searching for git repositories recursively..."
+        Write-Host ""
+        
+        $repos = Find-GitRepos -SearchPath "."
+        
+        if ($repos.Count -eq 0) {
+            Write-Host "No git repositories found in the current directory tree." -ForegroundColor Red
+            exit 1
+        }
+        
+        Write-Host "Found $($repos.Count) git repositories. Processing..." -ForegroundColor Cyan
+        Write-Host ("=" * 70)
+        Write-Host ""
+        
+        $repoNumber = 0
+        foreach ($repo in $repos) {
+            $repoNumber++
+            Write-Host "[$repoNumber/$($repos.Count)] Entering repository: $repo" -ForegroundColor Yellow
+            Write-Host ("-" * 70)
+            
+            # Change to repository directory and process
+            Push-Location $repo
+            try {
+                Process-SingleRepo -RepoPath $repo
+            } finally {
+                Pop-Location
+            }
+            
+            Write-Host ("=" * 70)
+            Write-Host ""
+        }
+        
+        Write-Host "All repositories processed!" -ForegroundColor Green
+    }
+    
     Write-Host ""
     Write-Host "To customize this script:"
     Write-Host "  - Edit sources.txt file in the script directory"

@@ -12,11 +12,63 @@ if errorlevel 1 exit /b 1
 REM Check if we're in a git repository
 git rev-parse --git-dir >nul 2>&1
 if errorlevel 1 (
-    echo Error: Not in a git repository!
-    exit /b 1
+    REM Not in a git repo - search for repos recursively
+    echo Not in a git repository. Searching for git repositories recursively...
+    echo.
+    
+    set "repos_found=0"
+    set "repos_processed=0"
+    
+    REM Count repositories first
+    for /f "delims=" %%i in ('dir /b /s /ad .git 2^>nul') do (
+        set /a repos_found+=1
+    )
+    
+    if !repos_found!==0 (
+        echo No git repositories found in the current directory tree.
+        exit /b 1
+    )
+    
+    echo Found !repos_found! git repositories. Processing...
+    echo ========================================================================
+    echo.
+    
+    REM Process each repository
+    for /f "delims=" %%i in ('dir /b /s /ad .git 2^>nul') do (
+        set "git_dir=%%i"
+        for %%j in ("!git_dir!\..") do set "repo_dir=%%~fj"
+        
+        set /a repos_processed+=1
+        echo [!repos_processed!/!repos_found!] Entering repository: !repo_dir!
+        echo ------------------------------------------------------------------------
+        
+        pushd "!repo_dir!"
+        call :process_single_repo "!repo_dir!"
+        popd
+        
+        echo ========================================================================
+        echo.
+    )
+    
+    echo All repositories processed!
+) else (
+    REM In a git repo - process normally
+    echo Adding copyright headers based on git history...
+    call :process_single_repo "%CD%"
 )
 
-echo Adding copyright headers based on git history...
+echo.
+echo To customize this script:
+echo   - Edit sources.txt file in the script directory
+echo   - Update COMPANY_NAME and RIGHTS_STATEMENT values
+echo   - Add SPECIAL_AUTHOR entries for special author formatting
+echo   - Add FILE_EXT entries for additional file types
+echo   - Add EXCLUDE_DIR entries to skip directories
+goto :eof
+
+:process_single_repo
+set "repo_path=%~1"
+echo Processing repository: %repo_path%
 echo Company: %COMPANY_NAME%
 if not "%RIGHTS_STATEMENT%"=="" echo Rights: %RIGHTS_STATEMENT%
 echo.
@@ -25,14 +77,8 @@ REM Process all source files based on configuration
 call :process_all_files
 
 echo.
-echo Copyright headers added successfully!
+echo Copyright headers added successfully for %repo_path%!
 echo.
-echo To customize this script:
-echo   - Edit sources.txt file in the script directory
-echo   - Update COMPANY_NAME and RIGHTS_STATEMENT values
-echo   - Add SPECIAL_AUTHOR entries for special author formatting
-echo   - Add FILE_EXT entries for additional file types
-echo   - Add EXCLUDE_DIR entries to skip directories
 goto :eof
 
 :load_config

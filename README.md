@@ -14,6 +14,8 @@ A reusable script that automatically adds copyright headers to source files base
 - **Customizable Rights Statement**: Add "All Rights Reserved" or other legal text
 - **Cross-Platform**: Available for Linux/Mac (bash), Windows (batch), and PowerShell
 - **Configuration File**: All settings now managed through a single `sources.txt` file
+- **Multi-Repository Support**: Process multiple git repositories recursively in one run
+- **Creation Timestamps**: Adds timestamp showing when copyright header was added
 
 ## Requirements
 
@@ -48,20 +50,53 @@ add_copyright_headers.bat   # Windows Batch
 1. Create a `sources.txt` file in the same directory as the scripts (see Configuration section below)
 2. Run the appropriate script for your platform:
 
-### Bash/Linux/Mac
+### Single Repository Mode
+Run the script from within a git repository:
+
+#### Bash/Linux/Mac
 ```bash
+cd /path/to/your/repo
 ./add_copyright_headers.sh
 ```
 
-### Windows Batch
+#### Windows Batch
 ```cmd
+cd C:\path\to\your\repo
 add_copyright_headers.bat
 ```
 
-### Windows PowerShell
+#### Windows PowerShell
 ```powershell
+cd C:\path\to\your\repo
 .\add_copyright_headers.ps1
 ```
+
+### Multi-Repository Mode (Recursive)
+Run the script from a parent directory containing multiple git repositories:
+
+#### Bash/Linux/Mac
+```bash
+cd ~/projects  # Contains multiple git repos
+./add_copyright_headers.sh
+```
+
+#### Windows Batch
+```cmd
+cd C:\projects  REM Contains multiple git repos
+add_copyright_headers.bat
+```
+
+#### Windows PowerShell
+```powershell
+cd C:\projects  # Contains multiple git repos
+.\add_copyright_headers.ps1
+```
+
+The script will:
+- Detect it's not in a git repository
+- Search recursively for all git repositories
+- Process each repository found
+- Show progress as [current/total]
 
 ## Configuration
 

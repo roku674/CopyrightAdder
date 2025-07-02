@@ -316,15 +316,10 @@ find_source_files() {
     eval "$find_cmd"
 }
 
-# Main execution
-main() {
-    # Check if we're in a git repository
-    if ! git rev-parse --git-dir > /dev/null 2>&1; then
-        echo "Error: Not in a git repository!"
-        exit 1
-    fi
-    
-    echo "Adding copyright headers based on git history..."
+# Function to process a single git repository
+process_single_repo() {
+    local repo_path="$1"
+    echo "Processing repository: $repo_path"
     echo "Company: $COMPANY_NAME"
     if [ -n "$RIGHTS_STATEMENT" ]; then
         echo "Rights: $RIGHTS_STATEMENT"
@@ -337,8 +332,66 @@ main() {
     done
     
     echo ""
-    echo "Copyright headers added successfully!"
+    echo "Copyright headers added successfully for $repo_path!"
     echo ""
+}
+
+# Function to find all git repositories recursively
+find_git_repos() {
+    local search_path="${1:-.}"
+    find "$search_path" -type d -name ".git" 2>/dev/null | while read -r git_dir; do
+        echo "$(dirname "$git_dir")"
+    done
+}
+
+# Main execution
+main() {
+    # Check if we're in a git repository
+    if git rev-parse --git-dir > /dev/null 2>&1; then
+        # Single repository mode
+        echo "Adding copyright headers based on git history..."
+        process_single_repo "$(pwd)"
+    else
+        # Multi-repository mode
+        echo "Not in a git repository. Searching for git repositories recursively..."
+        echo ""
+        
+        local repos_found=0
+        local repos_processed=0
+        
+        # Find all git repositories
+        while IFS= read -r repo; do
+            ((repos_found++))
+        done < <(find_git_repos ".")
+        
+        if [ $repos_found -eq 0 ]; then
+            echo "No git repositories found in the current directory tree."
+            exit 1
+        fi
+        
+        echo "Found $repos_found git repositories. Processing..."
+        echo "=" 
+        echo ""
+        
+        # Process each repository
+        find_git_repos "." | while IFS= read -r repo; do
+            ((repos_processed++))
+            echo "[$repos_processed/$repos_found] Entering repository: $repo"
+            echo "-"
+            
+            # Change to repository directory
+            (
+                cd "$repo" || continue
+                process_single_repo "$repo"
+            )
+            
+            echo "="
+            echo ""
+        done
+        
+        echo "All repositories processed!"
+    fi
+    
     echo "To customize this script:"
     echo "  - Edit sources.txt file in the script directory"
     echo "  - Update COMPANY_NAME and RIGHTS_STATEMENT values"
