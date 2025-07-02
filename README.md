@@ -1,7 +1,7 @@
 # Universal Copyright Header Script
 
 ## Description
-A reusable bash script that automatically adds copyright headers to source files based on git history. It correctly attributes each file to its original author by checking git logs.
+A reusable script that automatically adds copyright headers to source files based on git history. It correctly attributes each file to its original author by checking git logs. Available for bash (Linux/Mac), Windows batch, and PowerShell.
 
 ## Features
 - **Automatic Author Detection**: Uses `git log` to find who created each file
@@ -10,6 +10,8 @@ A reusable bash script that automatically adds copyright headers to source files
 - **Special Author Handling**: Can add website/contact info for specific authors
 - **Smart Updates**: Updates existing copyright headers without duplicating
 - **Exclusion Patterns**: Automatically excludes build artifacts, dependencies, and generated files
+- **Customizable Rights Statement**: Add "All Rights Reserved" or other legal text
+- **Cross-Platform**: Available for Linux/Mac (bash), Windows (batch), and PowerShell
 
 ## Usage
 
@@ -23,7 +25,32 @@ A reusable bash script that automatically adds copyright headers to source files
 COMPANY_NAME="MyCompany" ./add_copyright_headers.sh
 ```
 
+### With Rights Statement
+```bash
+COMPANY_NAME="Perilous Games, Ltd." RIGHTS_STATEMENT="All Rights Reserved" ./add_copyright_headers.sh
+```
+
+### Windows Batch File
+```cmd
+set COMPANY_NAME=MyCompany
+set RIGHTS_STATEMENT=All Rights Reserved
+add_copyright_headers.bat
+```
+
+### Windows PowerShell
+```powershell
+.\add_copyright_headers.ps1 -CompanyName "MyCompany" -RightsStatement "All Rights Reserved"
+# Or using environment variables:
+$env:COMPANY_NAME = "MyCompany"
+$env:RIGHTS_STATEMENT = "All Rights Reserved"
+.\add_copyright_headers.ps1
+```
+
 ## Configuration
+
+### Environment Variables
+- `COMPANY_NAME` - The company name to use in copyright (default: "Alexander")
+- `RIGHTS_STATEMENT` - Optional rights text like "All Rights Reserved" (default: empty)
 
 ### Special Authors
 Edit the `SPECIAL_AUTHORS` array in the script to add special formatting for specific contributors:
@@ -53,9 +80,19 @@ SPECIAL_AUTHORS=(
 //Copyright CompanyName, 2024, Written by John Doe
 ```
 
+### With Rights Statement
+```
+//Copyright CompanyName, 2024. All Rights Reserved, Written by John Doe
+```
+
 ### Special Author Output
 ```
 //Copyright CompanyName, 2024, Written by John Doe https://johndoe.com
+```
+
+### Full Example with Rights Statement
+```
+//Copyright Perilous Games, Ltd., 2024. All Rights Reserved, Written by Alexander Fields https://www.alexanderfields.me
 ```
 
 ## How It Works

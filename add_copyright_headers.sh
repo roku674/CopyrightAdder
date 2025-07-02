@@ -6,6 +6,7 @@
 
 # Configuration
 COMPANY_NAME="${COMPANY_NAME:-Alexander}"  # Can be overridden by environment variable
+RIGHTS_STATEMENT="${RIGHTS_STATEMENT:-}"  # Can be overridden by environment variable (e.g., "All Rights Reserved")
 SPECIAL_AUTHORS=(
     "roku674@gmail.com|Alexander Fields|https://www.alexanderfields.me"
     # Add more special authors here in format: email|name|website
@@ -101,29 +102,52 @@ add_copyright_header() {
     # Format the author
     formatted_author=$(format_author "$author_name" "$author_email")
     
+    # Get last editor info from git
+    editor_info=$(git log -1 --format='%an|%ae|%ad' --date=format:'%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null)
+    if [ -n "$editor_info" ]; then
+        IFS='|' read -r editor_name editor_email editor_date <<< "$editor_info"
+        formatted_editor=$(format_author "$editor_name" "$editor_email")
+    fi
+    
     # Build the copyright header
-    local header="${comment_style}Copyright $COMPANY_NAME, $year, Written by $formatted_author${comment_end}"
+    if [ -n "$RIGHTS_STATEMENT" ]; then
+        local header="${comment_style} Copyright $COMPANY_NAME, $year. $RIGHTS_STATEMENT Created by $formatted_author${comment_end}"
+    else
+        local header="${comment_style} Copyright $COMPANY_NAME, $year. All Rights Reserved. Created by $formatted_author${comment_end}"
+    fi
+    
+    # Add edited by line if editor is different from author
+    local header2=""
+    if [ -n "$editor_email" ] && [ "$editor_email" != "$author_email" ]; then
+        header2="${comment_style} Edited by $formatted_editor $editor_date${comment_end}"
+    fi
     
     # Check if file already has a copyright header in the first 10 lines
     if head -n 10 "$file" | grep -q "Copyright.*$COMPANY_NAME"; then
         echo "File already has copyright header, updating: $file"
-        # Create temp file without old copyright lines
+        # Create temp file without old copyright and edited by lines
         temp_file=$(mktemp)
-        awk -v cs="$comment_style" '
-            BEGIN {found=0; line_count=0} 
+        awk '
+            BEGIN {line_count=0} 
             {line_count++}
-            line_count <= 10 && $0 ~ "^"cs"Copyright" {found=1; next}
+            line_count <= 15 && ($0 ~ /Copyright/ || $0 ~ /Edited by/) {next}
             {print}
         ' "$file" > "$temp_file"
         
-        # Add new header and rest of file
+        # Add new headers and rest of file
         echo "$header" > "$file"
+        if [ -n "$header2" ]; then
+            echo "$header2" >> "$file"
+        fi
         cat "$temp_file" >> "$file"
         rm "$temp_file"
     else
-        # Add new copyright header at the beginning
+        # Add new copyright headers at the beginning
         temp_file=$(mktemp)
         echo "$header" > "$temp_file"
+        if [ -n "$header2" ]; then
+            echo "$header2" >> "$temp_file"
+        fi
         cat "$file" >> "$temp_file"
         mv "$temp_file" "$file"
     fi
@@ -184,6 +208,9 @@ main() {
     
     echo "Adding copyright headers based on git history..."
     echo "Company: $COMPANY_NAME"
+    if [ -n "$RIGHTS_STATEMENT" ]; then
+        echo "Rights: $RIGHTS_STATEMENT"
+    fi
     echo ""
     
     # Process all source files
@@ -196,6 +223,7 @@ main() {
     echo ""
     echo "To customize this script:"
     echo "  - Set COMPANY_NAME environment variable"
+    echo "  - Set RIGHTS_STATEMENT environment variable (e.g., 'All Rights Reserved')"
     echo "  - Edit SPECIAL_AUTHORS array in the script"
     echo "  - Add more file extensions in find_source_files function"
 }
