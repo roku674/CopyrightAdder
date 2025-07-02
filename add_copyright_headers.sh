@@ -1,8 +1,7 @@
-# Copyright Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-02 09:35:27
-# Edited by Alexander Fields https://www.alexanderfields.me 2025-07-02 11:17:11
+# Copyright © Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-02 09:35:27
+# Edited by Alexander Fields https://www.alexanderfields.me 2025-07-02 11:48:15
 #!/bin/bash
 
-# Universal Copyright Header Script
 # Automatically adds copyright headers with correct attribution based on git history
 # Works with any git repository
 
@@ -181,9 +180,9 @@ add_copyright_header() {
     
     # Build the copyright header with creation timestamp from git
     if [ -n "$RIGHTS_STATEMENT" ]; then
-        local copyright_text="Copyright $COMPANY_NAME, $year. $RIGHTS_STATEMENT Created by $formatted_author on $creation_timestamp"
+        local copyright_text="Copyright © $COMPANY_NAME, $year. $RIGHTS_STATEMENT Created by $formatted_author on $creation_timestamp"
     else
-        local copyright_text="Copyright $COMPANY_NAME, $year. All Rights Reserved. Created by $formatted_author on $creation_timestamp"
+        local copyright_text="Copyright © $COMPANY_NAME, $year. All Rights Reserved. Created by $formatted_author on $creation_timestamp"
     fi
     
     # Add edited by info if editor is different from author
@@ -258,7 +257,7 @@ add_copyright_header() {
         fi
         
         # Check if file already has a copyright header in the first 10 lines
-        if head -n 10 "$file" | grep -q "Copyright.*$COMPANY_NAME"; then
+        if head -n 10 "$file" | grep -q "Copyright.*©.*$COMPANY_NAME\|Copyright.*$COMPANY_NAME"; then
             echo "File already has copyright header, updating: $file"
             # Create temp file without old copyright and edited by lines
             temp_file=$(mktemp)

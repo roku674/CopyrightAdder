@@ -240,9 +240,9 @@ function Add-CopyrightHeader {
     
     # Build the copyright text with creation timestamp from git
     if ($RightsStatement) {
-        $copyrightText = "Copyright $CompanyName, $year. $RightsStatement Created by $formattedAuthor on $creationTimestamp"
+        $copyrightText = "Copyright © $CompanyName, $year. $RightsStatement Created by $formattedAuthor on $creationTimestamp"
     } else {
-        $copyrightText = "Copyright $CompanyName, $year. All Rights Reserved. Created by $formattedAuthor on $creationTimestamp"
+        $copyrightText = "Copyright © $CompanyName, $year. All Rights Reserved. Created by $formattedAuthor on $creationTimestamp"
     }
     
     # Add edited by info if editor is different from author
@@ -332,7 +332,7 @@ function Add-CopyrightHeader {
         
         $hasCopyright = $false
         foreach ($line in $first10Lines) {
-            if ($line -match "Copyright.*$([regex]::Escape($CompanyName))") {
+            if ($line -match "Copyright.*©.*$([regex]::Escape($CompanyName))|Copyright.*$([regex]::Escape($CompanyName))") {
                 $hasCopyright = $true
                 break
             }

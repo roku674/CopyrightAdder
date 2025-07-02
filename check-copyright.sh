@@ -1,3 +1,4 @@
+# Copyright © Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-02 16:19:48
 #!/bin/bash
 # Run copyright header check locally
 # Usage: ./CopyrightAdder/check-copyright.sh
