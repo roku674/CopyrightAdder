@@ -93,3 +93,6 @@ FILE_EXT_40=el
 
 # JSON files
 FILE_EXT_41=json
+
+# Files to exclude from processing (exact filenames)
+EXCLUDE_FILE_1=pom.xml
