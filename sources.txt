@@ -4,7 +4,7 @@
 # Lines starting with # are comments
 
 # Company name for copyright
-COMPANY_NAME=Alexander
+COMPANY_NAME=Alexander Fields 
 
 # Rights statement (leave empty for "All Rights Reserved")
 RIGHTS_STATEMENT=
