@@ -4,13 +4,72 @@
 # Automatically adds copyright headers with correct attribution based on git history
 # Works with any git repository
 
-# Configuration
-COMPANY_NAME="${COMPANY_NAME:-Alexander}"  # Can be overridden by environment variable
-RIGHTS_STATEMENT="${RIGHTS_STATEMENT:-}"  # Can be overridden by environment variable (e.g., "All Rights Reserved")
-SPECIAL_AUTHORS=(
-    "roku674@gmail.com|Alexander Fields|https://www.alexanderfields.me"
-    # Add more special authors here in format: email|name|website
-)
+# Function to read configuration from sources.txt
+read_config() {
+    local config_file="sources.txt"
+    
+    # Check if sources.txt exists in current directory
+    if [ ! -f "$config_file" ]; then
+        # Check if it exists in script directory
+        local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        config_file="$script_dir/sources.txt"
+        
+        if [ ! -f "$config_file" ]; then
+            echo "Error: sources.txt not found!"
+            echo "Please create a sources.txt file with configuration."
+            exit 1
+        fi
+    fi
+    
+    # Read configuration values
+    COMPANY_NAME=""
+    RIGHTS_STATEMENT=""
+    SPECIAL_AUTHORS=()
+    EXCLUDE_DIRS=()
+    FILE_EXTENSIONS=()
+    
+    while IFS='=' read -r key value; do
+        # Skip comments and empty lines
+        [[ "$key" =~ ^#.*$ ]] && continue
+        [[ -z "$key" ]] && continue
+        
+        # Trim whitespace
+        key=$(echo "$key" | xargs)
+        value=$(echo "$value" | xargs)
+        
+        case "$key" in
+            COMPANY_NAME)
+                COMPANY_NAME="$value"
+                ;;
+            RIGHTS_STATEMENT)
+                RIGHTS_STATEMENT="$value"
+                ;;
+            SPECIAL_AUTHOR_*)
+                if [ -n "$value" ]; then
+                    SPECIAL_AUTHORS+=("$value")
+                fi
+                ;;
+            EXCLUDE_DIR_*)
+                if [ -n "$value" ]; then
+                    EXCLUDE_DIRS+=("$value")
+                fi
+                ;;
+            FILE_EXT_*)
+                if [ -n "$value" ]; then
+                    FILE_EXTENSIONS+=("$value")
+                fi
+                ;;
+        esac
+    done < "$config_file"
+    
+    # Set defaults if not configured
+    if [ -z "$COMPANY_NAME" ]; then
+        COMPANY_NAME="Alexander"
+    fi
+}
+
+# Load configuration
+read_config
 
 # Function to get author info from git
 get_git_author_info() {
@@ -157,40 +216,26 @@ add_copyright_header() {
 
 # Function to find all source files
 find_source_files() {
-    local exclude_dirs=(
-        "node_modules"
-        ".git"
-        "dist"
-        "build"
-        "bin"
-        "obj"
-        "target"
-        ".next"
-        ".nuxt"
-        "coverage"
-        "__pycache__"
-        ".pytest_cache"
-        "vendor"
-        "packages"
-        ".vs"
-        ".vscode"
-        ".idea"
-    )
-    
-    # Build find command with exclusions
+    # Build find command with exclusions from config
     local find_cmd="find . -type f"
-    for dir in "${exclude_dirs[@]}"; do
+    for dir in "${EXCLUDE_DIRS[@]}"; do
         find_cmd="$find_cmd -not -path './$dir/*'"
     done
     
-    # Add file extensions to search for
-    find_cmd="$find_cmd \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.cs' \
-        -o -name '*.java' -o -name '*.js' -o -name '*.jsx' -o -name '*.ts' -o -name '*.tsx' \
-        -o -name '*.go' -o -name '*.swift' -o -name '*.kt' -o -name '*.scala' -o -name '*.groovy' \
-        -o -name '*.dart' -o -name '*.rs' -o -name '*.py' -o -name '*.rb' -o -name '*.sh' \
-        -o -name '*.pl' -o -name '*.r' -o -name '*.jl' -o -name '*.nim' -o -name '*.cr' \
-        -o -name '*.ex' -o -name '*.exs' -o -name '*.sql' -o -name '*.lisp' -o -name '*.clj' \
-        -o -name '*.scm' -o -name '*.el' \)"
+    # Add file extensions to search for from config
+    if [ ${#FILE_EXTENSIONS[@]} -gt 0 ]; then
+        find_cmd="$find_cmd \("
+        local first=true
+        for ext in "${FILE_EXTENSIONS[@]}"; do
+            if [ "$first" = true ]; then
+                find_cmd="$find_cmd -name '*.$ext'"
+                first=false
+            else
+                find_cmd="$find_cmd -o -name '*.$ext'"
+            fi
+        done
+        find_cmd="$find_cmd \)"
+    fi
     
     # Exclude minified files and migrations
     find_cmd="$find_cmd -not -name '*.min.js' -not -name '*.min.css' -not -path '*/migrations/*'"
@@ -222,10 +267,11 @@ main() {
     echo "Copyright headers added successfully!"
     echo ""
     echo "To customize this script:"
-    echo "  - Set COMPANY_NAME environment variable"
-    echo "  - Set RIGHTS_STATEMENT environment variable (e.g., 'All Rights Reserved')"
-    echo "  - Edit SPECIAL_AUTHORS array in the script"
-    echo "  - Add more file extensions in find_source_files function"
+    echo "  - Edit sources.txt file in the script directory"
+    echo "  - Update COMPANY_NAME and RIGHTS_STATEMENT values"
+    echo "  - Add SPECIAL_AUTHOR entries for special author formatting"
+    echo "  - Add FILE_EXT entries for additional file types"
+    echo "  - Add EXCLUDE_DIR entries to skip directories"
 }
 
 # Run main function

@@ -2,20 +2,84 @@
 # Automatically adds copyright headers with correct attribution based on git history
 # Works with any git repository
 
-param(
-    [string]$CompanyName = $env:COMPANY_NAME ?? "Alexander",
-    [string]$RightsStatement = $env:RIGHTS_STATEMENT ?? ""
-)
-
-# Special authors configuration
-$SpecialAuthors = @(
-    @{
-        Email = "roku674@gmail.com"
-        Name = "Alexander Fields"
-        Website = "https://www.alexanderfields.me"
+# Function to read configuration from sources.txt
+function Read-Config {
+    $configFile = "sources.txt"
+    
+    # Check if sources.txt exists in current directory
+    if (-not (Test-Path $configFile)) {
+        # Check if it exists in script directory
+        $scriptDir = Split-Path -Parent $MyInvocation.ScriptName
+        $configFile = Join-Path $scriptDir "sources.txt"
+        
+        if (-not (Test-Path $configFile)) {
+            Write-Host "Error: sources.txt not found!" -ForegroundColor Red
+            Write-Host "Please create a sources.txt file with configuration."
+            exit 1
+        }
     }
-    # Add more special authors here
-)
+    
+    # Initialize configuration
+    $script:CompanyName = ""
+    $script:RightsStatement = ""
+    $script:SpecialAuthors = @()
+    $script:ExcludeDirs = @()
+    $script:FileExtensions = @()
+    
+    # Read configuration values
+    Get-Content $configFile | ForEach-Object {
+        $line = $_.Trim()
+        
+        # Skip comments and empty lines
+        if ($line -match '^#' -or [string]::IsNullOrWhiteSpace($line)) {
+            return
+        }
+        
+        if ($line -match '^([^=]+)=(.*)$') {
+            $key = $matches[1].Trim()
+            $value = $matches[2].Trim()
+            
+            switch -Regex ($key) {
+                '^COMPANY_NAME$' {
+                    $script:CompanyName = $value
+                }
+                '^RIGHTS_STATEMENT$' {
+                    $script:RightsStatement = $value
+                }
+                '^SPECIAL_AUTHOR_\d+$' {
+                    if ($value) {
+                        $parts = $value -split '\|'
+                        if ($parts.Count -ge 2) {
+                            $script:SpecialAuthors += @{
+                                Email = $parts[0]
+                                Name = $parts[1]
+                                Website = if ($parts.Count -gt 2) { $parts[2] } else { "" }
+                            }
+                        }
+                    }
+                }
+                '^EXCLUDE_DIR_\d+$' {
+                    if ($value) {
+                        $script:ExcludeDirs += $value
+                    }
+                }
+                '^FILE_EXT_\d+$' {
+                    if ($value) {
+                        $script:FileExtensions += $value
+                    }
+                }
+            }
+        }
+    }
+    
+    # Set defaults if not configured
+    if (-not $script:CompanyName) {
+        $script:CompanyName = "Alexander"
+    }
+}
+
+# Load configuration
+Read-Config
 
 # Function to get author info from git
 function Get-GitAuthorInfo {
@@ -229,37 +293,15 @@ function Add-CopyrightHeader {
 
 # Function to find all source files
 function Find-SourceFiles {
-    $excludeDirs = @(
-        "node_modules",
-        ".git",
-        "dist",
-        "build",
-        "bin",
-        "obj",
-        "target",
-        ".next",
-        ".nuxt",
-        "coverage",
-        "__pycache__",
-        ".pytest_cache",
-        "vendor",
-        "packages",
-        ".vs",
-        ".vscode",
-        ".idea"
-    )
-    
-    $extensions = @(
-        "*.c", "*.cc", "*.cpp", "*.cs",
-        "*.java", "*.js", "*.jsx", "*.ts", "*.tsx",
-        "*.go", "*.swift", "*.kt", "*.scala", "*.groovy",
-        "*.dart", "*.rs", "*.py", "*.rb", "*.sh",
-        "*.pl", "*.r", "*.jl", "*.nim", "*.cr",
-        "*.ex", "*.exs", "*.sql", "*.lisp", "*.clj",
-        "*.scm", "*.el"
-    )
-    
     $files = @()
+    
+    # Build extension filters from config
+    $extensions = $script:FileExtensions | ForEach-Object { "*.$_" }
+    
+    if ($extensions.Count -eq 0) {
+        Write-Host "Warning: No file extensions configured in sources.txt" -ForegroundColor Yellow
+        return $files
+    }
     
     foreach ($ext in $extensions) {
         $foundFiles = Get-ChildItem -Path . -Filter $ext -Recurse -File -ErrorAction SilentlyContinue
@@ -268,7 +310,7 @@ function Find-SourceFiles {
             $skip = $false
             
             # Check if file is in excluded directory
-            foreach ($excludeDir in $excludeDirs) {
+            foreach ($excludeDir in $script:ExcludeDirs) {
                 if ($file.FullName -match [regex]::Escape($excludeDir)) {
                     $skip = $true
                     break
@@ -322,10 +364,11 @@ function Main {
     Write-Host "Copyright headers added successfully!" -ForegroundColor Green
     Write-Host ""
     Write-Host "To customize this script:"
-    Write-Host "  - Set COMPANY_NAME environment variable or use -CompanyName parameter"
-    Write-Host "  - Set RIGHTS_STATEMENT environment variable or use -RightsStatement parameter"
-    Write-Host "  - Edit `$SpecialAuthors array in the script"
-    Write-Host "  - Add more file extensions in Find-SourceFiles function"
+    Write-Host "  - Edit sources.txt file in the script directory"
+    Write-Host "  - Update COMPANY_NAME and RIGHTS_STATEMENT values"
+    Write-Host "  - Add SPECIAL_AUTHOR entries for special author formatting"
+    Write-Host "  - Add FILE_EXT entries for additional file types"
+    Write-Host "  - Add EXCLUDE_DIR entries to skip directories"
 }
 
 # Run main function

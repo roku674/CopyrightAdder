@@ -5,13 +5,9 @@ REM Universal Copyright Header Script for Windows
 REM Automatically adds copyright headers with correct attribution based on git history
 REM Works with any git repository
 
-REM Configuration
-if "%COMPANY_NAME%"=="" set COMPANY_NAME=Alexander
-if "%RIGHTS_STATEMENT%"=="" set RIGHTS_STATEMENT=
-
-REM Special authors configuration
-set SPECIAL_AUTHORS[0]=roku674@gmail.com^|Alexander Fields^|https://www.alexanderfields.me
-REM Add more special authors here
+REM Load configuration from sources.txt
+call :load_config
+if errorlevel 1 exit /b 1
 
 REM Check if we're in a git repository
 git rev-parse --git-dir >nul 2>&1
@@ -25,26 +21,123 @@ echo Company: %COMPANY_NAME%
 if not "%RIGHTS_STATEMENT%"=="" echo Rights: %RIGHTS_STATEMENT%
 echo.
 
-REM Process all source files
-for /r . %%F in (*.c *.cc *.cpp *.cs *.java *.js *.jsx *.ts *.tsx *.go *.swift *.kt *.scala *.groovy *.dart *.rs *.py *.rb *.sh *.pl *.r *.jl *.nim *.cr *.ex *.exs *.sql *.lisp *.clj *.scm *.el) do (
-    REM Skip certain directories
-    echo %%F | findstr /i "node_modules .git dist build bin obj target .next .nuxt coverage __pycache__ .pytest_cache vendor packages .vs .vscode .idea" >nul
-    if errorlevel 1 (
-        REM Skip minified files
-        echo %%F | findstr /i ".min.js .min.css" >nul
-        if errorlevel 1 (
-            call :process_file "%%F"
-        )
-    )
-)
+REM Process all source files based on configuration
+call :process_all_files
 
 echo.
 echo Copyright headers added successfully!
 echo.
 echo To customize this script:
-echo   - Set COMPANY_NAME environment variable
-echo   - Set RIGHTS_STATEMENT environment variable (e.g., "All Rights Reserved")
-echo   - Edit SPECIAL_AUTHORS array in the script
+echo   - Edit sources.txt file in the script directory
+echo   - Update COMPANY_NAME and RIGHTS_STATEMENT values
+echo   - Add SPECIAL_AUTHOR entries for special author formatting
+echo   - Add FILE_EXT entries for additional file types
+echo   - Add EXCLUDE_DIR entries to skip directories
+goto :eof
+
+:load_config
+REM Find sources.txt
+set "config_file=sources.txt"
+if not exist "%config_file%" (
+    REM Check in script directory
+    set "config_file=%~dp0sources.txt"
+    if not exist "!config_file!" (
+        echo Error: sources.txt not found!
+        echo Please create a sources.txt file with configuration.
+        exit /b 1
+    )
+)
+
+REM Initialize variables
+set "COMPANY_NAME="
+set "RIGHTS_STATEMENT="
+set "special_count=0"
+set "exclude_count=0"
+set "ext_count=0"
+
+REM Read configuration
+for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^| findstr /v "^$"') do (
+    set "key=%%a"
+    set "value=%%b"
+    
+    REM Trim spaces
+    for /f "tokens=* delims= " %%c in ("!key!") do set "key=%%c"
+    for /f "tokens=* delims= " %%c in ("!value!") do set "value=%%c"
+    
+    if "!key!"=="COMPANY_NAME" set "COMPANY_NAME=!value!"
+    if "!key!"=="RIGHTS_STATEMENT" set "RIGHTS_STATEMENT=!value!"
+    
+    REM Special authors
+    echo !key! | findstr /b "SPECIAL_AUTHOR_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "SPECIAL_AUTHORS[!special_count!]=!value!"
+            set /a special_count+=1
+        )
+    )
+    
+    REM Exclude directories
+    echo !key! | findstr /b "EXCLUDE_DIR_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "EXCLUDE_DIRS[!exclude_count!]=!value!"
+            set /a exclude_count+=1
+        )
+    )
+    
+    REM File extensions
+    echo !key! | findstr /b "FILE_EXT_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "FILE_EXTS[!ext_count!]=!value!"
+            set /a ext_count+=1
+        )
+    )
+)
+
+REM Set defaults if not configured
+if "!COMPANY_NAME!"=="" set "COMPANY_NAME=Alexander"
+
+goto :eof
+
+:process_all_files
+REM Build file pattern list
+set "file_patterns="
+for /l %%i in (0,1,%ext_count%) do (
+    if defined FILE_EXTS[%%i] (
+        set "file_patterns=!file_patterns! *.!FILE_EXTS[%%i]!"
+    )
+)
+
+REM Process files with each extension
+for /l %%i in (0,1,%ext_count%) do (
+    if defined FILE_EXTS[%%i] (
+        for /r . %%F in (*.!FILE_EXTS[%%i]!) do (
+            set "skip_file=0"
+            
+            REM Check exclude directories
+            for /l %%j in (0,1,%exclude_count%) do (
+                if defined EXCLUDE_DIRS[%%j] (
+                    echo %%F | findstr /i "!EXCLUDE_DIRS[%%j]!" >nul
+                    if not errorlevel 1 set "skip_file=1"
+                )
+            )
+            
+            REM Skip minified files
+            echo %%F | findstr /i ".min.js .min.css" >nul
+            if not errorlevel 1 set "skip_file=1"
+            
+            REM Skip migrations
+            echo %%F | findstr /i "migrations" >nul
+            if not errorlevel 1 set "skip_file=1"
+            
+            if !skip_file!==0 (
+                call :process_file "%%F"
+            )
+        )
+    )
+)
+
 goto :eof
 
 :process_file
@@ -94,6 +187,111 @@ if not errorlevel 1 (
 
 REM Unknown file type
 echo Skipping unknown file type: %file%
+goto :eof
+
+:load_config
+REM Find sources.txt
+set "config_file=sources.txt"
+if not exist "%config_file%" (
+    REM Check in script directory
+    set "config_file=%~dp0sources.txt"
+    if not exist "!config_file!" (
+        echo Error: sources.txt not found!
+        echo Please create a sources.txt file with configuration.
+        exit /b 1
+    )
+)
+
+REM Initialize variables
+set "COMPANY_NAME="
+set "RIGHTS_STATEMENT="
+set "special_count=0"
+set "exclude_count=0"
+set "ext_count=0"
+
+REM Read configuration
+for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^| findstr /v "^$"') do (
+    set "key=%%a"
+    set "value=%%b"
+    
+    REM Trim spaces
+    for /f "tokens=* delims= " %%c in ("!key!") do set "key=%%c"
+    for /f "tokens=* delims= " %%c in ("!value!") do set "value=%%c"
+    
+    if "!key!"=="COMPANY_NAME" set "COMPANY_NAME=!value!"
+    if "!key!"=="RIGHTS_STATEMENT" set "RIGHTS_STATEMENT=!value!"
+    
+    REM Special authors
+    echo !key! | findstr /b "SPECIAL_AUTHOR_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "SPECIAL_AUTHORS[!special_count!]=!value!"
+            set /a special_count+=1
+        )
+    )
+    
+    REM Exclude directories
+    echo !key! | findstr /b "EXCLUDE_DIR_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "EXCLUDE_DIRS[!exclude_count!]=!value!"
+            set /a exclude_count+=1
+        )
+    )
+    
+    REM File extensions
+    echo !key! | findstr /b "FILE_EXT_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "FILE_EXTS[!ext_count!]=!value!"
+            set /a ext_count+=1
+        )
+    )
+)
+
+REM Set defaults if not configured
+if "!COMPANY_NAME!"=="" set "COMPANY_NAME=Alexander"
+
+goto :eof
+
+:process_all_files
+REM Build file pattern list
+set "file_patterns="
+for /l %%i in (0,1,%ext_count%) do (
+    if defined FILE_EXTS[%%i] (
+        set "file_patterns=!file_patterns! *.!FILE_EXTS[%%i]!"
+    )
+)
+
+REM Process files with each extension
+for /l %%i in (0,1,%ext_count%) do (
+    if defined FILE_EXTS[%%i] (
+        for /r . %%F in (*.!FILE_EXTS[%%i]!) do (
+            set "skip_file=0"
+            
+            REM Check exclude directories
+            for /l %%j in (0,1,%exclude_count%) do (
+                if defined EXCLUDE_DIRS[%%j] (
+                    echo %%F | findstr /i "!EXCLUDE_DIRS[%%j]!" >nul
+                    if not errorlevel 1 set "skip_file=1"
+                )
+            )
+            
+            REM Skip minified files
+            echo %%F | findstr /i ".min.js .min.css" >nul
+            if not errorlevel 1 set "skip_file=1"
+            
+            REM Skip migrations
+            echo %%F | findstr /i "migrations" >nul
+            if not errorlevel 1 set "skip_file=1"
+            
+            if !skip_file!==0 (
+                call :process_file "%%F"
+            )
+        )
+    )
+)
+
 goto :eof
 
 :got_style
@@ -220,6 +418,111 @@ move /y "!temp_file!" "%file%" >nul
 echo Processed: %file% ^(Author: !formatted_author!, Year: !year!^)
 goto :eof
 
+:load_config
+REM Find sources.txt
+set "config_file=sources.txt"
+if not exist "%config_file%" (
+    REM Check in script directory
+    set "config_file=%~dp0sources.txt"
+    if not exist "!config_file!" (
+        echo Error: sources.txt not found!
+        echo Please create a sources.txt file with configuration.
+        exit /b 1
+    )
+)
+
+REM Initialize variables
+set "COMPANY_NAME="
+set "RIGHTS_STATEMENT="
+set "special_count=0"
+set "exclude_count=0"
+set "ext_count=0"
+
+REM Read configuration
+for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^| findstr /v "^$"') do (
+    set "key=%%a"
+    set "value=%%b"
+    
+    REM Trim spaces
+    for /f "tokens=* delims= " %%c in ("!key!") do set "key=%%c"
+    for /f "tokens=* delims= " %%c in ("!value!") do set "value=%%c"
+    
+    if "!key!"=="COMPANY_NAME" set "COMPANY_NAME=!value!"
+    if "!key!"=="RIGHTS_STATEMENT" set "RIGHTS_STATEMENT=!value!"
+    
+    REM Special authors
+    echo !key! | findstr /b "SPECIAL_AUTHOR_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "SPECIAL_AUTHORS[!special_count!]=!value!"
+            set /a special_count+=1
+        )
+    )
+    
+    REM Exclude directories
+    echo !key! | findstr /b "EXCLUDE_DIR_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "EXCLUDE_DIRS[!exclude_count!]=!value!"
+            set /a exclude_count+=1
+        )
+    )
+    
+    REM File extensions
+    echo !key! | findstr /b "FILE_EXT_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "FILE_EXTS[!ext_count!]=!value!"
+            set /a ext_count+=1
+        )
+    )
+)
+
+REM Set defaults if not configured
+if "!COMPANY_NAME!"=="" set "COMPANY_NAME=Alexander"
+
+goto :eof
+
+:process_all_files
+REM Build file pattern list
+set "file_patterns="
+for /l %%i in (0,1,%ext_count%) do (
+    if defined FILE_EXTS[%%i] (
+        set "file_patterns=!file_patterns! *.!FILE_EXTS[%%i]!"
+    )
+)
+
+REM Process files with each extension
+for /l %%i in (0,1,%ext_count%) do (
+    if defined FILE_EXTS[%%i] (
+        for /r . %%F in (*.!FILE_EXTS[%%i]!) do (
+            set "skip_file=0"
+            
+            REM Check exclude directories
+            for /l %%j in (0,1,%exclude_count%) do (
+                if defined EXCLUDE_DIRS[%%j] (
+                    echo %%F | findstr /i "!EXCLUDE_DIRS[%%j]!" >nul
+                    if not errorlevel 1 set "skip_file=1"
+                )
+            )
+            
+            REM Skip minified files
+            echo %%F | findstr /i ".min.js .min.css" >nul
+            if not errorlevel 1 set "skip_file=1"
+            
+            REM Skip migrations
+            echo %%F | findstr /i "migrations" >nul
+            if not errorlevel 1 set "skip_file=1"
+            
+            if !skip_file!==0 (
+                call :process_file "%%F"
+            )
+        )
+    )
+)
+
+goto :eof
+
 :format_author
 set "auth_name=%~1"
 set "auth_email=%~2"
@@ -236,6 +539,111 @@ if defined SPECIAL_AUTHORS[!i!] (
                 set "formatted_author=%%b"
             )
             goto :eof
+
+:load_config
+REM Find sources.txt
+set "config_file=sources.txt"
+if not exist "%config_file%" (
+    REM Check in script directory
+    set "config_file=%~dp0sources.txt"
+    if not exist "!config_file!" (
+        echo Error: sources.txt not found!
+        echo Please create a sources.txt file with configuration.
+        exit /b 1
+    )
+)
+
+REM Initialize variables
+set "COMPANY_NAME="
+set "RIGHTS_STATEMENT="
+set "special_count=0"
+set "exclude_count=0"
+set "ext_count=0"
+
+REM Read configuration
+for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^| findstr /v "^$"') do (
+    set "key=%%a"
+    set "value=%%b"
+    
+    REM Trim spaces
+    for /f "tokens=* delims= " %%c in ("!key!") do set "key=%%c"
+    for /f "tokens=* delims= " %%c in ("!value!") do set "value=%%c"
+    
+    if "!key!"=="COMPANY_NAME" set "COMPANY_NAME=!value!"
+    if "!key!"=="RIGHTS_STATEMENT" set "RIGHTS_STATEMENT=!value!"
+    
+    REM Special authors
+    echo !key! | findstr /b "SPECIAL_AUTHOR_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "SPECIAL_AUTHORS[!special_count!]=!value!"
+            set /a special_count+=1
+        )
+    )
+    
+    REM Exclude directories
+    echo !key! | findstr /b "EXCLUDE_DIR_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "EXCLUDE_DIRS[!exclude_count!]=!value!"
+            set /a exclude_count+=1
+        )
+    )
+    
+    REM File extensions
+    echo !key! | findstr /b "FILE_EXT_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "FILE_EXTS[!ext_count!]=!value!"
+            set /a ext_count+=1
+        )
+    )
+)
+
+REM Set defaults if not configured
+if "!COMPANY_NAME!"=="" set "COMPANY_NAME=Alexander"
+
+goto :eof
+
+:process_all_files
+REM Build file pattern list
+set "file_patterns="
+for /l %%i in (0,1,%ext_count%) do (
+    if defined FILE_EXTS[%%i] (
+        set "file_patterns=!file_patterns! *.!FILE_EXTS[%%i]!"
+    )
+)
+
+REM Process files with each extension
+for /l %%i in (0,1,%ext_count%) do (
+    if defined FILE_EXTS[%%i] (
+        for /r . %%F in (*.!FILE_EXTS[%%i]!) do (
+            set "skip_file=0"
+            
+            REM Check exclude directories
+            for /l %%j in (0,1,%exclude_count%) do (
+                if defined EXCLUDE_DIRS[%%j] (
+                    echo %%F | findstr /i "!EXCLUDE_DIRS[%%j]!" >nul
+                    if not errorlevel 1 set "skip_file=1"
+                )
+            )
+            
+            REM Skip minified files
+            echo %%F | findstr /i ".min.js .min.css" >nul
+            if not errorlevel 1 set "skip_file=1"
+            
+            REM Skip migrations
+            echo %%F | findstr /i "migrations" >nul
+            if not errorlevel 1 set "skip_file=1"
+            
+            if !skip_file!==0 (
+                call :process_file "%%F"
+            )
+        )
+    )
+)
+
+goto :eof
         )
         if "!auth_name!"=="%%b" (
             if not "%%c"=="" (
@@ -244,10 +652,220 @@ if defined SPECIAL_AUTHORS[!i!] (
                 set "formatted_author=%%b"
             )
             goto :eof
+
+:load_config
+REM Find sources.txt
+set "config_file=sources.txt"
+if not exist "%config_file%" (
+    REM Check in script directory
+    set "config_file=%~dp0sources.txt"
+    if not exist "!config_file!" (
+        echo Error: sources.txt not found!
+        echo Please create a sources.txt file with configuration.
+        exit /b 1
+    )
+)
+
+REM Initialize variables
+set "COMPANY_NAME="
+set "RIGHTS_STATEMENT="
+set "special_count=0"
+set "exclude_count=0"
+set "ext_count=0"
+
+REM Read configuration
+for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^| findstr /v "^$"') do (
+    set "key=%%a"
+    set "value=%%b"
+    
+    REM Trim spaces
+    for /f "tokens=* delims= " %%c in ("!key!") do set "key=%%c"
+    for /f "tokens=* delims= " %%c in ("!value!") do set "value=%%c"
+    
+    if "!key!"=="COMPANY_NAME" set "COMPANY_NAME=!value!"
+    if "!key!"=="RIGHTS_STATEMENT" set "RIGHTS_STATEMENT=!value!"
+    
+    REM Special authors
+    echo !key! | findstr /b "SPECIAL_AUTHOR_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "SPECIAL_AUTHORS[!special_count!]=!value!"
+            set /a special_count+=1
+        )
+    )
+    
+    REM Exclude directories
+    echo !key! | findstr /b "EXCLUDE_DIR_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "EXCLUDE_DIRS[!exclude_count!]=!value!"
+            set /a exclude_count+=1
+        )
+    )
+    
+    REM File extensions
+    echo !key! | findstr /b "FILE_EXT_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "FILE_EXTS[!ext_count!]=!value!"
+            set /a ext_count+=1
+        )
+    )
+)
+
+REM Set defaults if not configured
+if "!COMPANY_NAME!"=="" set "COMPANY_NAME=Alexander"
+
+goto :eof
+
+:process_all_files
+REM Build file pattern list
+set "file_patterns="
+for /l %%i in (0,1,%ext_count%) do (
+    if defined FILE_EXTS[%%i] (
+        set "file_patterns=!file_patterns! *.!FILE_EXTS[%%i]!"
+    )
+)
+
+REM Process files with each extension
+for /l %%i in (0,1,%ext_count%) do (
+    if defined FILE_EXTS[%%i] (
+        for /r . %%F in (*.!FILE_EXTS[%%i]!) do (
+            set "skip_file=0"
+            
+            REM Check exclude directories
+            for /l %%j in (0,1,%exclude_count%) do (
+                if defined EXCLUDE_DIRS[%%j] (
+                    echo %%F | findstr /i "!EXCLUDE_DIRS[%%j]!" >nul
+                    if not errorlevel 1 set "skip_file=1"
+                )
+            )
+            
+            REM Skip minified files
+            echo %%F | findstr /i ".min.js .min.css" >nul
+            if not errorlevel 1 set "skip_file=1"
+            
+            REM Skip migrations
+            echo %%F | findstr /i "migrations" >nul
+            if not errorlevel 1 set "skip_file=1"
+            
+            if !skip_file!==0 (
+                call :process_file "%%F"
+            )
+        )
+    )
+)
+
+goto :eof
         )
     )
     set /a i+=1
     goto :check_special_loop
+)
+
+goto :eof
+
+:load_config
+REM Find sources.txt
+set "config_file=sources.txt"
+if not exist "%config_file%" (
+    REM Check in script directory
+    set "config_file=%~dp0sources.txt"
+    if not exist "!config_file!" (
+        echo Error: sources.txt not found!
+        echo Please create a sources.txt file with configuration.
+        exit /b 1
+    )
+)
+
+REM Initialize variables
+set "COMPANY_NAME="
+set "RIGHTS_STATEMENT="
+set "special_count=0"
+set "exclude_count=0"
+set "ext_count=0"
+
+REM Read configuration
+for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^| findstr /v "^$"') do (
+    set "key=%%a"
+    set "value=%%b"
+    
+    REM Trim spaces
+    for /f "tokens=* delims= " %%c in ("!key!") do set "key=%%c"
+    for /f "tokens=* delims= " %%c in ("!value!") do set "value=%%c"
+    
+    if "!key!"=="COMPANY_NAME" set "COMPANY_NAME=!value!"
+    if "!key!"=="RIGHTS_STATEMENT" set "RIGHTS_STATEMENT=!value!"
+    
+    REM Special authors
+    echo !key! | findstr /b "SPECIAL_AUTHOR_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "SPECIAL_AUTHORS[!special_count!]=!value!"
+            set /a special_count+=1
+        )
+    )
+    
+    REM Exclude directories
+    echo !key! | findstr /b "EXCLUDE_DIR_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "EXCLUDE_DIRS[!exclude_count!]=!value!"
+            set /a exclude_count+=1
+        )
+    )
+    
+    REM File extensions
+    echo !key! | findstr /b "FILE_EXT_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "FILE_EXTS[!ext_count!]=!value!"
+            set /a ext_count+=1
+        )
+    )
+)
+
+REM Set defaults if not configured
+if "!COMPANY_NAME!"=="" set "COMPANY_NAME=Alexander"
+
+goto :eof
+
+:process_all_files
+REM Build file pattern list
+set "file_patterns="
+for /l %%i in (0,1,%ext_count%) do (
+    if defined FILE_EXTS[%%i] (
+        set "file_patterns=!file_patterns! *.!FILE_EXTS[%%i]!"
+    )
+)
+
+REM Process files with each extension
+for /l %%i in (0,1,%ext_count%) do (
+    if defined FILE_EXTS[%%i] (
+        for /r . %%F in (*.!FILE_EXTS[%%i]!) do (
+            set "skip_file=0"
+            
+            REM Check exclude directories
+            for /l %%j in (0,1,%exclude_count%) do (
+                if defined EXCLUDE_DIRS[%%j] (
+                    echo %%F | findstr /i "!EXCLUDE_DIRS[%%j]!" >nul
+                    if not errorlevel 1 set "skip_file=1"
+                )
+            )
+            
+            REM Skip minified files
+            echo %%F | findstr /i ".min.js .min.css" >nul
+            if not errorlevel 1 set "skip_file=1"
+            
+            REM Skip migrations
+            echo %%F | findstr /i "migrations" >nul
+            if not errorlevel 1 set "skip_file=1"
+            
+            if !skip_file!==0 (
+                call :process_file "%%F"
+            )
+        )
+    )
 )
 
 goto :eof
