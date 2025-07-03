@@ -1,0 +1,35 @@
+# Copyright © Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-02 12:33:32 -->
+# Edited by Alexander Fields https://www.alexanderfields.me 2025-07-02 16:19:52 -->
+name: Reset develop to master
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write   # allows pushing to develop
+
+jobs:
+  reset-develop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout all branches
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # get full history so we can force-push
+          ref: master             # start on master
+
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Reset develop to master
+        run: |
+          # Force-update the local develop branch to point at master
+          git branch -f develop master
+
+      - name: Force-push develop
+        run: |
+          git push origin develop --force
