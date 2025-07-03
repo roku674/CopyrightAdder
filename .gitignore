@@ -23,3 +23,6 @@ __pycache__/
 .Python
 *.pyc
 sources.txt
+
+# Copyright adder tool (not a submodule)
+CopyrightAdder/
