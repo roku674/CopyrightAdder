@@ -11,6 +11,7 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    target-branch: "develop"
     groups:
       production-dependencies:
         dependency-type: "production"
@@ -23,6 +24,7 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    target-branch: "develop"
     
   # Enable version updates for Docker
   - package-ecosystem: "docker"
@@ -30,6 +32,7 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    target-branch: "develop"
     
   # Enable version updates for pip (Python)
   - package-ecosystem: "pip"
@@ -37,6 +40,7 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    target-branch: "develop"
     
   # Enable version updates for Maven
   - package-ecosystem: "maven"
@@ -44,6 +48,7 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    target-branch: "develop"
     
   # Enable version updates for Gradle
   - package-ecosystem: "gradle"
@@ -51,6 +56,7 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    target-branch: "develop"
     
   # Enable version updates for NuGet
   - package-ecosystem: "nuget"
@@ -58,6 +64,7 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    target-branch: "develop"
     
   # Enable version updates for Composer (PHP)
   - package-ecosystem: "composer"
@@ -65,6 +72,7 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    target-branch: "develop"
     
   # Enable version updates for Bundler (Ruby)
   - package-ecosystem: "bundler"
@@ -72,6 +80,7 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    target-branch: "develop"
     
   # Enable version updates for Go modules
   - package-ecosystem: "gomod"
@@ -79,6 +88,7 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    target-branch: "develop"
     
   # Enable version updates for Cargo (Rust)
   - package-ecosystem: "cargo"
@@ -86,3 +96,4 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    target-branch: "develop"
