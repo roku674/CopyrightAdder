@@ -1,0 +1,83 @@
+# Example: Using CopyrightAdder as a GitHub Action in your repository
+
+# Option 1: Copy the workflow and script to your repository
+# 1. Copy .github/workflows/copyright-check.yml to your repo
+# 2. Copy the CopyrightAdder directory to your repo root
+# 3. Customize CopyrightAdder/sources.txt with your company details
+
+# Option 2: Reference this repository (if made public)
+name: Copyright Header Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  copyright-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+      workflows: write
+    
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Download CopyrightAdder
+        run: |
+          # Clone just the CopyrightAdder directory
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/yourusername/Copyright.git
+          cd Copyright
+          git sparse-checkout set CopyrightAdder
+          mv CopyrightAdder ../
+          cd ..
+          rm -rf Copyright
+      
+      - name: Configure Copyright Settings
+        run: |
+          # Override with your company settings
+          cat > CopyrightAdder/sources.txt << 'EOF'
+          COMPANY_NAME=Your Company Name
+          RIGHTS_STATEMENT=All Rights Reserved
+          SPECIAL_AUTHOR_dev@company.com=Developer Name https://company.com
+          EXCLUDE_DIR=node_modules
+          EXCLUDE_DIR=vendor
+          EXCLUDE_DIR=.git
+          FILE_EXT_jsx=//
+          FILE_EXT_tsx=//
+          EOF
+      
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v40
+        with:
+          files: |
+            **/*.{java,js,ts,jsx,tsx,cpp,cc,c,h,cs,py,go,rs,rb,php,sh,yaml,yml,json,xml,html}
+      
+      - name: Run Copyright Adder
+        if: steps.changed-files.outputs.any_changed == 'true'
+        env:
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+        run: |
+          chmod +x CopyrightAdder/add_copyright_headers.sh
+          for file in $CHANGED_FILES; do
+            if [ -f "$file" ]; then
+              ./CopyrightAdder/add_copyright_headers.sh "$file"
+            fi
+          done
+      
+      - name: Commit changes
+        run: |
+          if [[ -n $(git status --porcelain) ]]; then
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            git add -A
+            git commit -m "Add copyright headers to new files"
+            git push
+          fi
