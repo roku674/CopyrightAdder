@@ -118,9 +118,25 @@ jobs:
           # Create and checkout new branch
           git checkout -b "${NEW_BRANCH}"
           
-          # Commit changes
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
+          # Get the original PR author information to preserve attribution
+          ORIGINAL_AUTHOR_NAME="${{ github.event.pull_request.user.login }}"
+          ORIGINAL_AUTHOR_EMAIL="${{ github.event.pull_request.user.email }}"
+          
+          # If email is not available from PR, try to get it from the commit
+          if [ -z "$ORIGINAL_AUTHOR_EMAIL" ] || [ "$ORIGINAL_AUTHOR_EMAIL" = "null" ]; then
+            # Get email from the most recent commit in the PR
+            ORIGINAL_AUTHOR_EMAIL=$(git log -1 --format='%ae' ${{ github.event.pull_request.head.sha }})
+            ORIGINAL_AUTHOR_NAME=$(git log -1 --format='%an' ${{ github.event.pull_request.head.sha }})
+          fi
+          
+          # Fallback to a reasonable default if still not available
+          if [ -z "$ORIGINAL_AUTHOR_EMAIL" ] || [ "$ORIGINAL_AUTHOR_EMAIL" = "null" ]; then
+            ORIGINAL_AUTHOR_EMAIL="${ORIGINAL_AUTHOR_NAME}@users.noreply.github.com"
+          fi
+          
+          # Set git config to use the original author's identity
+          git config --local user.email "$ORIGINAL_AUTHOR_EMAIL"
+          git config --local user.name "$ORIGINAL_AUTHOR_NAME"
           git add -A
           
           # Commit copyright header changes
