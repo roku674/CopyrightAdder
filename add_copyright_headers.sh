@@ -28,6 +28,7 @@ read_config() {
     SPECIAL_AUTHORS=()
     EXCLUDE_DIRS=()
     FILE_EXTENSIONS=()
+    EXCLUDE_FILES=()
     
     while IFS='=' read -r key value; do
         # Skip comments and empty lines
@@ -58,6 +59,11 @@ read_config() {
             FILE_EXT_*)
                 if [ -n "$value" ]; then
                     FILE_EXTENSIONS+=("$value")
+                fi
+                ;;
+            EXCLUDE_FILE_*)
+                if [ -n "$value" ]; then
+                    EXCLUDE_FILES+=("$value")
                 fi
                 ;;
         esac
@@ -129,6 +135,13 @@ should_process_file() {
     if [[ "$basename" == *.min.js ]] || [[ "$basename" == *.min.css ]]; then
         return 1
     fi
+    
+    # Check if file is in exclude list
+    for excluded_file in "${EXCLUDE_FILES[@]}"; do
+        if [[ "$basename" == "$excluded_file" ]]; then
+            return 1
+        fi
+    done
     
     # Skip if no file extensions configured
     if [ ${#FILE_EXTENSIONS[@]} -eq 0 ]; then
@@ -226,6 +239,12 @@ add_copyright_header() {
         return
     fi
     
+    # Check if file should be processed
+    if ! should_process_file "$file"; then
+        echo "Skipping excluded file: $file"
+        return
+    fi
+    
     # Get file extension
     local ext="${file##*.}"
     local comment_style=""
@@ -252,10 +271,6 @@ add_copyright_header() {
         # Lisp style
         lisp|clj|scm|el)
             comment_style=";;"
-            ;;
-        # JSON style - special handling
-        json)
-            comment_style="json_special"
             ;;
         # Skip unknown types
         *)
@@ -307,65 +322,8 @@ add_copyright_header() {
         edited_text="Edited by $formatted_editor $editor_date"
     fi
     
-    # Handle JSON files specially
-    if [ "$comment_style" = "json_special" ]; then
-        # For JSON files, we need to add/update the "copyright" key
-        if [ -f "$file" ] && [ -s "$file" ]; then
-            # Check if file already has copyright key
-            if grep -q '"copyright"' "$file"; then
-                echo "File already has copyright key, updating: $file"
-                # Update existing copyright value
-                temp_file=$(mktemp)
-                if [ -n "$edited_text" ]; then
-                    jq --arg copyright "$copyright_text" --arg edited "$edited_text" \
-                        '.copyright = ($copyright + ", " + $edited)' "$file" > "$temp_file" 2>/dev/null || {
-                        # If jq fails, try simple sed replacement
-                        sed -E "s/\"copyright\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"copyright\": \"$copyright_text, $edited_text\"/" "$file" > "$temp_file"
-                    }
-                else
-                    jq --arg copyright "$copyright_text" \
-                        '.copyright = $copyright' "$file" > "$temp_file" 2>/dev/null || {
-                        # If jq fails, try simple sed replacement
-                        sed -E "s/\"copyright\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"copyright\": \"$copyright_text\"/" "$file" > "$temp_file"
-                    }
-                fi
-                mv "$temp_file" "$file"
-            else
-                echo "Adding copyright key to JSON: $file"
-                # Add copyright key to JSON
-                temp_file=$(mktemp)
-                if [ -n "$edited_text" ]; then
-                    copyright_value="$copyright_text, $edited_text"
-                else
-                    copyright_value="$copyright_text"
-                fi
-                
-                # Try to add copyright as first key using jq
-                jq --arg copyright "$copyright_value" '. = {copyright: $copyright} + .' "$file" > "$temp_file" 2>/dev/null || {
-                    # If jq is not available or fails, do simple string manipulation
-                    # Read first line
-                    first_line=$(head -n 1 "$file")
-                    if [[ "$first_line" == "{"* ]]; then
-                        # Add copyright after opening brace
-                        echo "{" > "$temp_file"
-                        echo "  \"copyright\": \"$copyright_value\"," >> "$temp_file"
-                        tail -n +2 "$file" | sed '1s/^/  /' >> "$temp_file"
-                    else
-                        # Couldn't parse, skip
-                        echo "Warning: Could not parse JSON structure in $file"
-                        return
-                    fi
-                }
-                mv "$temp_file" "$file"
-            fi
-        else
-            # Empty or new JSON file
-            echo "{" > "$file"
-            echo "  \"copyright\": \"$copyright_text\"" >> "$file"
-            echo "}" >> "$file"
-        fi
-    else
-        # Non-JSON files - use comment-based headers
+    # Non-JSON files - use comment-based headers
+    if [ -n "$comment_style" ]; then
         local header="${comment_style} $copyright_text${comment_end}"
         local header2=""
         if [ -n "$edited_text" ]; then
