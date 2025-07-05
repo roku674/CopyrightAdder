@@ -34,6 +34,13 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           submodules: recursive
       
+      - name: Configure Git Identity
+        run: |
+          # Configure git with a safe default identity for the workflow
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          echo "Git identity configured for workflow operations"
+      
       - name: Setup Copyright Adder
         run: |
           # Initialize submodules if not already done
