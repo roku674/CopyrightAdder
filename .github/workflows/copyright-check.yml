@@ -85,7 +85,7 @@ jobs:
         uses: tj-actions/changed-files@v46
         with:
           files: |
-            **/*.{java,js,ts,jsx,tsx,cpp,cc,c,h,cs,py,go,rs,rb,php,sh,yaml,yml,json,xml,html,sql}
+            **/*.{java,js,ts,jsx,tsx,cpp,cc,c,h,cs,py,go,rs,rb,php,sh,json,xml,html,sql}
       
       - name: Run Copyright Adder on changed files
         if: steps.changed-files.outputs.any_changed == 'true'

@@ -73,8 +73,7 @@ FILE_EXT_25=nim
 FILE_EXT_26=cr
 FILE_EXT_27=ex
 FILE_EXT_28=exs
-FILE_EXT_29=yaml
-FILE_EXT_30=toml
+FILE_EXT_29=toml
 
 # XML/HTML style
 FILE_EXT_32=xml
