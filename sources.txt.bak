@@ -1,0 +1,109 @@
+# Copyright Header Configuration File
+# This file contains all configuration for the copyright header scripts
+# Format: KEY=VALUE (one per line)
+# Lines starting with # are comments
+
+# Company name for copyright
+COMPANY_NAME=Alexander Fields 
+
+# Rights statement (leave empty for "All Rights Reserved")
+RIGHTS_STATEMENT=
+
+# Special authors with websites
+# Format: email|name|website
+SPECIAL_AUTHOR_1=roku674@gmail.com|Alexander Fields|https://www.alexanderfields.me
+# Add more special authors as needed
+# SPECIAL_AUTHOR_2=email@example.com|Name Here|https://example.com
+# SPECIAL_AUTHOR_3=another@email.com|Another Name|
+
+# Directories to exclude from processing
+EXCLUDE_DIR_1=node_modules
+EXCLUDE_DIR_2=.git
+EXCLUDE_DIR_3=dist
+EXCLUDE_DIR_4=build
+EXCLUDE_DIR_5=bin
+EXCLUDE_DIR_6=obj
+EXCLUDE_DIR_7=target
+EXCLUDE_DIR_8=.next
+EXCLUDE_DIR_9=.nuxt
+EXCLUDE_DIR_10=coverage
+EXCLUDE_DIR_11=__pycache__
+EXCLUDE_DIR_12=.pytest_cache
+EXCLUDE_DIR_13=vendor
+EXCLUDE_DIR_14=packages
+EXCLUDE_DIR_15=.vs
+EXCLUDE_DIR_16=.vscode
+EXCLUDE_DIR_17=.idea
+EXCLUDE_DIR_18=venv
+EXCLUDE_DIR_19=.venv
+EXCLUDE_DIR_20=env
+EXCLUDE_DIR_21=.env
+EXCLUDE_DIR_22=virtualenv
+EXCLUDE_DIR_23=.github
+EXCLUDE_DIR_24=CopyrightAdder
+EXCLUDE_DIR_25=Copyright
+
+# File extensions to process
+# C-style comments
+FILE_EXT_1=c
+FILE_EXT_2=cc
+FILE_EXT_3=cpp
+FILE_EXT_4=cs
+FILE_EXT_5=java
+FILE_EXT_6=js
+FILE_EXT_7=jsx
+FILE_EXT_8=ts
+FILE_EXT_9=tsx
+FILE_EXT_10=go
+FILE_EXT_11=swift
+FILE_EXT_12=kt
+FILE_EXT_13=scala
+FILE_EXT_14=groovy
+FILE_EXT_15=dart
+FILE_EXT_16=rs
+
+# Hash comments
+FILE_EXT_17=py
+FILE_EXT_18=rb
+FILE_EXT_19=sh
+FILE_EXT_20=bash
+FILE_EXT_21=zsh
+FILE_EXT_22=pl
+FILE_EXT_23=r
+FILE_EXT_24=jl
+FILE_EXT_25=nim
+FILE_EXT_26=cr
+FILE_EXT_27=ex
+FILE_EXT_28=exs
+FILE_EXT_29=toml
+
+# XML/HTML style
+FILE_EXT_32=xml
+FILE_EXT_33=html
+FILE_EXT_34=htm
+FILE_EXT_35=svg
+
+# SQL style
+FILE_EXT_36=sql
+
+# Lisp style
+FILE_EXT_37=lisp
+FILE_EXT_38=clj
+FILE_EXT_39=scm
+FILE_EXT_40=el
+
+
+# Files to exclude from processing (exact filenames)
+EXCLUDE_FILE_1=pom.xml
+EXCLUDE_FILE_2=settings.json
+EXCLUDE_FILE_3=package.json
+EXCLUDE_FILE_4=package-lock.json
+EXCLUDE_FILE_5=launchsettings.json
+EXCLUDE_FILE_6=.eslintrc
+EXCLUDE_FILE_7=.eslintrc.js
+EXCLUDE_FILE_8=.eslintrc.json
+EXCLUDE_FILE_9=.eslintrc.yaml
+EXCLUDE_FILE_10=.eslintrc.yml
+EXCLUDE_FILE_11=eslint.config.js
+EXCLUDE_FILE_12=eslint.config.mjs
+EXCLUDE_FILE_13=eslint.config.cjs
