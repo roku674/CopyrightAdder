@@ -17,7 +17,6 @@ jobs:
     # 1. PR is from github-actions bot (prevent infinite loops)
     # 2. This is the Copyright/CopyrightAdder repo itself
     if: |
-      github.actor != 'github-actions[bot]' && 
       github.actor != 'dependabot[bot]' &&
       github.repository != 'roku674/Copyright' &&
       github.repository != 'roku674/CopyrightAdder'
@@ -119,8 +118,6 @@ jobs:
           git checkout -b "${NEW_BRANCH}"
           
           # Commit changes
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
           git add -A
           
           # Commit copyright header changes
@@ -232,13 +229,10 @@ jobs:
       - name: Delete workflow after merge
         if: |
           github.event_name == 'push' && 
-          github.actor != 'github-actions[bot]' &&
           (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') &&
           contains(github.event.head_commit.message, 'copyright')
         run: |
           echo "Detected copyright-related merge to main branch - deleting workflow"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
           
           # Remove the workflow file
           if [ -f ".github/workflows/copyright-check.yml" ]; then
