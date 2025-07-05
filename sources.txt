@@ -39,6 +39,7 @@ EXCLUDE_DIR_19=.venv
 EXCLUDE_DIR_20=env
 EXCLUDE_DIR_21=.env
 EXCLUDE_DIR_22=virtualenv
+EXCLUDE_DIR_23=.github
 
 # File extensions to process
 # C-style comments

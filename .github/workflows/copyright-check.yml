@@ -35,30 +35,52 @@ jobs:
       
       - name: Setup Copyright Adder
         run: |
-          # Initialize submodules
+          # Initialize submodules if not already done
           git submodule update --init --recursive
           
-          # Make script executable
-          chmod +x CopyrightAdder/add_copyright_headers.sh
-          
-          # Copy the local sources.txt to override the submodule's version
-          if [ -f sources.txt ]; then
-            cp sources.txt CopyrightAdder/sources.txt
+          # Check if CopyrightAdder exists as submodule, otherwise download
+          if [ -f "CopyrightAdder/add_copyright_headers.sh" ]; then
+            echo "Using existing CopyrightAdder submodule"
+            chmod +x CopyrightAdder/add_copyright_headers.sh
+          elif [ -f "Copyright/CopyrightAdder/add_copyright_headers.sh" ]; then
+            echo "Using existing Copyright/CopyrightAdder submodule"
+            chmod +x Copyright/CopyrightAdder/add_copyright_headers.sh
+          else
+            echo "Downloading CopyrightAdder as fallback"
+            mkdir -p CopyrightAdder
+            curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/main/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh
+            # Use local sources.txt if available, otherwise download
+            if [ ! -f "sources.txt" ]; then
+              curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/main/sources.txt -o sources.txt
+            fi
+            chmod +x CopyrightAdder/add_copyright_headers.sh
           fi
       
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v46
+        uses: tj-actions/changed-files@v40
         with:
           files: |
             **/*.{java,js,ts,jsx,tsx,cpp,cc,c,h,cs,py,go,rs,rb,php,sh,yaml,yml,json,xml,html,sql}
       
-      - name: Run Copyright Adder on changed files
+      - name: Run Copyright Adder
         if: steps.changed-files.outputs.any_changed == 'true'
         run: |
-          echo "Adding copyright headers to changed files..."
-          # The script processes all files in the repository
-          ./CopyrightAdder/add_copyright_headers.sh
+          echo "Adding copyright headers to repository files..."
+          
+          # Determine script path based on submodule structure
+          if [ -f "CopyrightAdder/add_copyright_headers.sh" ]; then
+            SCRIPT_PATH="./CopyrightAdder/add_copyright_headers.sh"
+          elif [ -f "Copyright/CopyrightAdder/add_copyright_headers.sh" ]; then
+            SCRIPT_PATH="./Copyright/CopyrightAdder/add_copyright_headers.sh"
+          else
+            echo "Error: Could not find CopyrightAdder script"
+            exit 1
+          fi
+          
+          # Run the script on the entire repository
+          # The script will process all files based on sources.txt configuration
+          $SCRIPT_PATH
       
       - name: Check for changes
         id: check-changes
@@ -76,6 +98,7 @@ jobs:
             echo "All files have proper copyright headers."
           fi
       
+      
       - name: Create new branch for copyright headers
         if: steps.check-changes.outputs.changes == 'true'
         id: create-branch
@@ -92,6 +115,8 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add -A
+          
+          # Commit copyright header changes
           git commit -m "Add copyright headers to source files"
           
           # Push the new branch
