@@ -40,6 +40,8 @@ EXCLUDE_DIR_20=env
 EXCLUDE_DIR_21=.env
 EXCLUDE_DIR_22=virtualenv
 EXCLUDE_DIR_23=.github
+EXCLUDE_DIR_24=CopyrightAdder
+EXCLUDE_DIR_25=Copyright
 
 # File extensions to process
 # C-style comments

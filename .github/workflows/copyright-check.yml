@@ -16,10 +16,15 @@ jobs:
     # Skip if:
     # 1. PR is from github-actions bot (prevent infinite loops)
     # 2. This is the Copyright/CopyrightAdder repo itself
+    # 3. PR is from a copyright-headers branch (prevent infinite loops)
+    # 4. PR author is any bot (contains [bot] in username)
     if: |
+      github.actor != 'github-actions[bot]' && 
       github.actor != 'dependabot[bot]' &&
       github.repository != 'roku674/Copyright' &&
-      github.repository != 'roku674/CopyrightAdder'
+      github.repository != 'roku674/CopyrightAdder' &&
+      !startsWith(github.head_ref, 'copyright-headers/') &&
+      !contains(github.event.pull_request.user.login, '[bot]')
     permissions:
       contents: write
       pull-requests: write
