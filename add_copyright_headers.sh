@@ -76,12 +76,22 @@ read_config
 get_git_author_info() {
     local file="$1"
     local info=""
+    local source_branch="${SOURCE_BRANCH:-}"
     
-    # Get the first commit that created this file with full timestamp, excluding bot commits
-    info=$(git log --diff-filter=A --follow --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
-           grep -v "github-actions\[bot\]" | \
-           grep -v "dependabot\[bot\]" | \
-           tail -1)
+    # If we have a source branch (from GitHub Actions), use that for history
+    if [ -n "$source_branch" ]; then
+        # Get the first commit that created this file from the source branch
+        info=$(git log "$source_branch" --diff-filter=A --follow --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
+               grep -v "github-actions\[bot\]" | \
+               grep -v "dependabot\[bot\]" | \
+               tail -1)
+    else
+        # Normal operation - get from current branch
+        info=$(git log --diff-filter=A --follow --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
+               grep -v "github-actions\[bot\]" | \
+               grep -v "dependabot\[bot\]" | \
+               tail -1)
+    fi
     
     if [ -z "$info" ]; then
         # If file not in git history yet, try to get current git user
@@ -91,10 +101,17 @@ get_git_author_info() {
         # Skip if current user is a bot
         if [[ "$current_author" == *"[bot]"* ]]; then
             # Try to get from environment or previous commits
-            info=$(git log --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' 2>/dev/null | \
-                   grep -v "github-actions\[bot\]" | \
-                   grep -v "dependabot\[bot\]" | \
-                   head -1)
+            if [ -n "$source_branch" ]; then
+                info=$(git log "$source_branch" --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' 2>/dev/null | \
+                       grep -v "github-actions\[bot\]" | \
+                       grep -v "dependabot\[bot\]" | \
+                       head -1)
+            else
+                info=$(git log --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' 2>/dev/null | \
+                       grep -v "github-actions\[bot\]" | \
+                       grep -v "dependabot\[bot\]" | \
+                       head -1)
+            fi
         else
             local current_year=$(date +%Y)
             local current_timestamp=$(date '+%Y-%m-%d %H:%M:%S')
@@ -185,10 +202,20 @@ add_copyright_header() {
     formatted_author=$(format_author "$author_name" "$author_email")
     
     # Get last editor info from git, excluding bot commits
-    editor_info=$(git log --format='%an|%ae|%ad' --date=format:'%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
-                  grep -v "github-actions\[bot\]" | \
-                  grep -v "dependabot\[bot\]" | \
-                  head -1)
+    local source_branch="${SOURCE_BRANCH:-}"
+    if [ -n "$source_branch" ]; then
+        # Get editor info from source branch
+        editor_info=$(git log "$source_branch" --format='%an|%ae|%ad' --date=format:'%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
+                      grep -v "github-actions\[bot\]" | \
+                      grep -v "dependabot\[bot\]" | \
+                      head -1)
+    else
+        # Normal operation
+        editor_info=$(git log --format='%an|%ae|%ad' --date=format:'%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
+                      grep -v "github-actions\[bot\]" | \
+                      grep -v "dependabot\[bot\]" | \
+                      head -1)
+    fi
     if [ -n "$editor_info" ]; then
         IFS='|' read -r editor_name editor_email editor_date <<< "$editor_info"
         formatted_editor=$(format_author "$editor_name" "$editor_email")

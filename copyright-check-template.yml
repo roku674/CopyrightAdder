@@ -69,8 +69,13 @@ jobs:
         if: steps.changed-files.outputs.any_changed == 'true'
         env:
           CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+          SOURCE_BRANCH: ${{ github.head_ref }}
         run: |
           echo "Adding copyright headers to changed files..."
+          echo "Using source branch: $SOURCE_BRANCH for git history"
+          
+          # Ensure we have the source branch history
+          git fetch origin "$SOURCE_BRANCH"
           
           # Determine script path based on submodule structure
           if [ -f "CopyrightAdder/add_copyright_headers.sh" ]; then
@@ -85,7 +90,7 @@ jobs:
           for file in $CHANGED_FILES; do
             if [ -f "$file" ]; then
               echo "Processing: $file"
-              $SCRIPT_PATH "$file"
+              SOURCE_BRANCH="$SOURCE_BRANCH" $SCRIPT_PATH "$file"
             fi
           done
       
@@ -118,32 +123,10 @@ jobs:
           # Create and checkout new branch
           git checkout -b "${NEW_BRANCH}"
           
-          # Get the original PR author information to preserve attribution
-          ORIGINAL_AUTHOR_NAME="${{ github.event.pull_request.user.login }}"
-          ORIGINAL_AUTHOR_EMAIL="${{ github.event.pull_request.user.email }}"
-          
-          echo "DEBUG: Initial PR author name: $ORIGINAL_AUTHOR_NAME"
-          echo "DEBUG: Initial PR author email: $ORIGINAL_AUTHOR_EMAIL"
-          
-          # If email is not available from PR, try to get it from the commit
-          if [ -z "$ORIGINAL_AUTHOR_EMAIL" ] || [ "$ORIGINAL_AUTHOR_EMAIL" = "null" ]; then
-            # Get email from the most recent commit in the PR
-            ORIGINAL_AUTHOR_EMAIL=$(git log -1 --format='%ae' ${{ github.event.pull_request.head.sha }})
-            ORIGINAL_AUTHOR_NAME=$(git log -1 --format='%an' ${{ github.event.pull_request.head.sha }})
-            echo "DEBUG: Got from git log - name: $ORIGINAL_AUTHOR_NAME, email: $ORIGINAL_AUTHOR_EMAIL"
-          fi
-          
-          # Fallback to a reasonable default if still not available
-          if [ -z "$ORIGINAL_AUTHOR_EMAIL" ] || [ "$ORIGINAL_AUTHOR_EMAIL" = "null" ]; then
-            ORIGINAL_AUTHOR_EMAIL="${ORIGINAL_AUTHOR_NAME}@users.noreply.github.com"
-            echo "DEBUG: Using fallback email: $ORIGINAL_AUTHOR_EMAIL"
-          fi
-          
-          echo "DEBUG: Final author - name: $ORIGINAL_AUTHOR_NAME, email: $ORIGINAL_AUTHOR_EMAIL"
-          
-          # Set git config to use the original author's identity
-          git config --local user.email "$ORIGINAL_AUTHOR_EMAIL"
-          git config --local user.name "$ORIGINAL_AUTHOR_NAME"
+          # Since we're reading author info from the source branch in the script,
+          # we can use github-actions[bot] for the commit itself
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           git add -A
           
           # Commit copyright header changes
@@ -261,18 +244,9 @@ jobs:
         run: |
           echo "Detected copyright-related merge to main branch - deleting workflow"
           
-          # Get the original push author information
-          ORIGINAL_AUTHOR_NAME="${{ github.event.pusher.name }}"
-          ORIGINAL_AUTHOR_EMAIL="${{ github.event.pusher.email }}"
-          
-          # If email is not available, construct from username
-          if [ -z "$ORIGINAL_AUTHOR_EMAIL" ] || [ "$ORIGINAL_AUTHOR_EMAIL" = "null" ]; then
-            ORIGINAL_AUTHOR_EMAIL="${ORIGINAL_AUTHOR_NAME}@users.noreply.github.com"
-          fi
-          
-          # Set git config to use the original author's identity
-          git config --local user.email "$ORIGINAL_AUTHOR_EMAIL"
-          git config --local user.name "$ORIGINAL_AUTHOR_NAME"
+          # Use bot identity for workflow cleanup
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           
           # Remove the workflow file
           if [ -f ".github/workflows/copyright-check.yml" ]; then
