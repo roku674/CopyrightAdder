@@ -59,6 +59,7 @@ jobs:
       
       - name: Setup Copyright Adder
         run: |
+<<<<<<< HEAD
           # Check if CopyrightAdder exists as submodule, otherwise download
           if [ -d "CopyrightAdder" ]; then
             echo "Using existing CopyrightAdder submodule"
@@ -71,6 +72,26 @@ jobs:
             mkdir -p CopyrightAdder
             curl -sSL https://raw.githubusercontent.com/roku674/Copyright/main/CopyrightAdder/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh
             curl -sSL https://raw.githubusercontent.com/roku674/Copyright/main/CopyrightAdder/sources.txt -o CopyrightAdder/sources.txt
+=======
+          # Initialize submodules if not already done
+          git submodule update --init --recursive
+          
+          # Check if CopyrightAdder exists as submodule, otherwise download
+          if [ -f "CopyrightAdder/add_copyright_headers.sh" ]; then
+            echo "Using existing CopyrightAdder submodule"
+            chmod +x CopyrightAdder/add_copyright_headers.sh
+          elif [ -f "Copyright/CopyrightAdder/add_copyright_headers.sh" ]; then
+            echo "Using existing Copyright/CopyrightAdder submodule"
+            chmod +x Copyright/CopyrightAdder/add_copyright_headers.sh
+          else
+            echo "Downloading CopyrightAdder as fallback"
+            mkdir -p CopyrightAdder
+            curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/main/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh
+            # Use local sources.txt if available, otherwise download
+            if [ ! -f "sources.txt" ]; then
+              curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/main/sources.txt -o sources.txt
+            fi
+>>>>>>> 1afa6a8183bf427267d263f3d43af540ecc9b55b
             chmod +x CopyrightAdder/add_copyright_headers.sh
           fi
       
@@ -81,29 +102,44 @@ jobs:
           files: |
             **/*.{java,js,ts,jsx,tsx,cpp,cc,c,h,cs,py,go,rs,rb,php,sh,yaml,yml,json,xml,html,sql}
       
-      - name: Run Copyright Adder on changed files
+      - name: Run Copyright Adder
         if: steps.changed-files.outputs.any_changed == 'true'
         env:
           CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
+<<<<<<< HEAD
           echo "Adding copyright headers to changed files..."
           
           # Determine script path based on submodule structure
           if [ -d "CopyrightAdder" ]; then
             SCRIPT_PATH="./CopyrightAdder/add_copyright_headers.sh"
           elif [ -d "Copyright/CopyrightAdder" ]; then
+=======
+          echo "Adding copyright headers to repository files..."
+          
+          # Determine script path based on submodule structure
+          if [ -f "CopyrightAdder/add_copyright_headers.sh" ]; then
+            SCRIPT_PATH="./CopyrightAdder/add_copyright_headers.sh"
+          elif [ -f "Copyright/CopyrightAdder/add_copyright_headers.sh" ]; then
+>>>>>>> 1afa6a8183bf427267d263f3d43af540ecc9b55b
             SCRIPT_PATH="./Copyright/CopyrightAdder/add_copyright_headers.sh"
           else
             echo "Error: Could not find CopyrightAdder script"
             exit 1
           fi
           
+<<<<<<< HEAD
           for file in $CHANGED_FILES; do
             if [ -f "$file" ]; then
               echo "Processing: $file"
               $SCRIPT_PATH "$file"
             fi
           done
+=======
+          # Run the script on the entire repository
+          # The script will process all files based on sources.txt configuration
+          $SCRIPT_PATH
+>>>>>>> 1afa6a8183bf427267d263f3d43af540ecc9b55b
       
       - name: Check for changes
         id: check-changes
@@ -121,6 +157,7 @@ jobs:
             echo "All files have proper copyright headers."
           fi
       
+<<<<<<< HEAD
       - name: Check for workflow updates
         id: check-workflow-updates
         run: |
@@ -132,6 +169,8 @@ jobs:
             echo "workflow_changes=false" >> $GITHUB_OUTPUT
             echo "No workflow updates needed"
           fi
+=======
+>>>>>>> 1afa6a8183bf427267d263f3d43af540ecc9b55b
       
       - name: Create new branch for copyright headers
         if: steps.check-changes.outputs.changes == 'true' || steps.check-workflow-updates.outputs.workflow_changes == 'true'
@@ -150,6 +189,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add -A
           
+<<<<<<< HEAD
           # Create appropriate commit message based on what changed
           if [[ "${{ steps.check-changes.outputs.changes }}" == "true" && "${{ steps.check-workflow-updates.outputs.workflow_changes }}" == "true" ]]; then
             git commit -m "Add copyright headers and update workflow"
@@ -158,6 +198,10 @@ jobs:
           else
             git commit -m "Update copyright workflow"
           fi
+=======
+          # Commit copyright header changes
+          git commit -m "Add copyright headers to source files"
+>>>>>>> 1afa6a8183bf427267d263f3d43af540ecc9b55b
           
           # Push the new branch
           git push origin "${NEW_BRANCH}"
