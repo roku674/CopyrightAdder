@@ -413,6 +413,11 @@ add_copyright_header() {
 find_source_files() {
     # Build find command with exclusions from config
     local find_cmd="find . -type f"
+    
+    # Always exclude dot directories like .github, .git, .vscode, etc.
+    find_cmd="$find_cmd -not -path '*/.*'"
+    
+    # Add configured exclusions
     for dir in "${EXCLUDE_DIRS[@]}"; do
         find_cmd="$find_cmd -not -path '*/$dir/*' -not -name '$dir'"
     done
@@ -458,18 +463,25 @@ process_single_repo() {
         local skip=false
         local dir_basename=$(basename "$dir")
         
-        # Check if directory should be excluded
-        for exclude in "${EXCLUDE_DIRS[@]}"; do
-            if [[ "$dir_basename" == "$exclude" ]] || [[ "$dir" == *"/$exclude/"* ]]; then
-                skip=true
-                break
-            fi
-        done
+        # Always exclude .github and other dot directories
+        if [[ "$dir_basename" == .* ]]; then
+            skip=true
+        fi
+        
+        # Check if directory should be excluded based on config
+        if [ "$skip" = false ]; then
+            for exclude in "${EXCLUDE_DIRS[@]}"; do
+                if [[ "$dir_basename" == "$exclude" ]] || [[ "$dir" == *"/$exclude/"* ]]; then
+                    skip=true
+                    break
+                fi
+            done
+        fi
         
         if [ "$skip" = false ]; then
             directories+=("$dir")
         fi
-    done < <(find . -type d -not -path '*/\.*' 2>/dev/null | grep -v '^\.$')
+    done < <(find . -type d 2>/dev/null | grep -v '^\.$')
     
     echo "Found ${#directories[@]} directories to process"
     
