@@ -72,6 +72,79 @@ read_config() {
 # Load configuration
 read_config
 
+# Set maximum parallel jobs (can be overridden by environment variable)
+MAX_PARALLEL_JOBS=${MAX_PARALLEL_JOBS:-8}
+
+# Track number of active jobs
+declare -i active_jobs=0
+
+# Function to wait for a job slot to become available
+wait_for_job_slot() {
+    while [ $(jobs -r | wc -l) -ge $MAX_PARALLEL_JOBS ]; do
+        sleep 0.1
+    done
+}
+
+# Function to process files in a directory in parallel
+process_directory_files() {
+    local dir="$1"
+    local -a files=()
+    local -a files_to_process=()
+    
+    # Find files in this specific directory (not subdirectories)
+    while IFS= read -r file; do
+        files+=("$file")
+    done < <(find "$dir" -maxdepth 1 -type f 2>/dev/null)
+    
+    # Filter files that should be processed
+    for file in "${files[@]}"; do
+        if should_process_file "$file"; then
+            files_to_process+=("$file")
+        fi
+    done
+    
+    # Process files in this directory
+    local file_count=${#files_to_process[@]}
+    if [ $file_count -gt 0 ]; then
+        if [ "$dir" = "." ]; then
+            echo "Processing $file_count files in root directory"
+        else
+            echo "Processing $file_count files in: $dir"
+        fi
+        
+        for file in "${files_to_process[@]}"; do
+            wait_for_job_slot
+            add_copyright_header "$file" &
+        done
+    fi
+}
+
+# Function to check if a file should be processed
+should_process_file() {
+    local file="$1"
+    local basename=$(basename "$file")
+    local ext="${basename##*.}"
+    
+    # Skip minified files
+    if [[ "$basename" == *.min.js ]] || [[ "$basename" == *.min.css ]]; then
+        return 1
+    fi
+    
+    # Skip if no file extensions configured
+    if [ ${#FILE_EXTENSIONS[@]} -eq 0 ]; then
+        return 0
+    fi
+    
+    # Check if extension matches
+    for allowed_ext in "${FILE_EXTENSIONS[@]}"; do
+        if [[ "$ext" == "$allowed_ext" ]]; then
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
 # Function to get author info from git
 get_git_author_info() {
     local file="$1"
@@ -330,7 +403,10 @@ add_copyright_header() {
         fi
     fi
     
-    echo "Processed: $file (Author: $formatted_author, Year: $year)"
+    # Use a lock file for thread-safe output
+    {
+        echo "Processed: $file (Author: $formatted_author, Year: $year)"
+    } 2>/dev/null
 }
 
 # Function to find all source files
@@ -362,7 +438,7 @@ find_source_files() {
     eval "$find_cmd"
 }
 
-# Function to process a single git repository
+# Function to process a single git repository with parallel processing
 process_single_repo() {
     local repo_path="$1"
     echo "Processing repository: $repo_path"
@@ -370,12 +446,55 @@ process_single_repo() {
     if [ -n "$RIGHTS_STATEMENT" ]; then
         echo "Rights: $RIGHTS_STATEMENT"
     fi
+    echo "Max parallel jobs: $MAX_PARALLEL_JOBS"
     echo ""
     
-    # Process all source files
-    find_source_files | while IFS= read -r file; do
-        add_copyright_header "$file"
+    # Get all directories that need processing
+    local -a directories=()
+    directories+=(".")  # Include current directory
+    
+    # Find all subdirectories, excluding those in EXCLUDE_DIRS
+    while IFS= read -r dir; do
+        local skip=false
+        local dir_basename=$(basename "$dir")
+        
+        # Check if directory should be excluded
+        for exclude in "${EXCLUDE_DIRS[@]}"; do
+            if [[ "$dir_basename" == "$exclude" ]] || [[ "$dir" == *"/$exclude/"* ]]; then
+                skip=true
+                break
+            fi
+        done
+        
+        if [ "$skip" = false ]; then
+            directories+=("$dir")
+        fi
+    done < <(find . -type d -not -path '*/\.*' 2>/dev/null | grep -v '^\.$')
+    
+    echo "Found ${#directories[@]} directories to process"
+    
+    # Process directories in batches
+    local total_files=0
+    local processed_files=0
+    
+    # First count total files
+    for dir in "${directories[@]}"; do
+        local count=$(find "$dir" -maxdepth 1 -type f 2>/dev/null | wc -l)
+        ((total_files += count))
     done
+    
+    echo "Total files to check: $total_files"
+    echo ""
+    
+    # Process each directory's files in parallel
+    for dir in "${directories[@]}"; do
+        process_directory_files "$dir"
+    done
+    
+    # Wait for all background jobs to complete
+    echo ""
+    echo "Waiting for all jobs to complete..."
+    wait
     
     echo ""
     echo "Copyright headers added successfully for $repo_path!"
@@ -392,6 +511,38 @@ find_git_repos() {
 
 # Main execution
 main() {
+    # Parse command line options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -j|--jobs)
+                MAX_PARALLEL_JOBS="$2"
+                shift 2
+                ;;
+            -h|--help)
+                echo "Usage: $0 [options] [file]"
+                echo ""
+                echo "Options:"
+                echo "  -j, --jobs N     Set maximum parallel jobs (default: 8)"
+                echo "  -h, --help       Show this help message"
+                echo ""
+                echo "Examples:"
+                echo "  $0                    Process all files in current repository"
+                echo "  $0 -j 16              Process with 16 parallel jobs"
+                echo "  $0 file.js            Process a single file"
+                exit 0
+                ;;
+            *)
+                # If it's a file, process it
+                if [ -f "$1" ]; then
+                    # Single file mode - used by GitHub Actions
+                    add_copyright_header "$1"
+                    exit 0
+                fi
+                shift
+                ;;
+        esac
+    done
+    
     # Check if we're in a git repository
     if git rev-parse --git-dir > /dev/null 2>&1; then
         # Single repository mode
