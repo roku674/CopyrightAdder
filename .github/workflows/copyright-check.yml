@@ -7,6 +7,8 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [develop, master, main]
+  push:
+    branches: [develop, master, main]
 
 jobs:
   copyright-check:
@@ -221,6 +223,25 @@ jobs:
               issue_number: context.issue.number,
               body: `⚠️ **Missing Copyright Headers Detected**\n\n🤖 I've created PR #${pr.data.number} to add missing copyright headers to your branch.\n\n👀 Please review and merge it into your branch before this PR can be merged.\n\n---\n*Automated by [@roku674](https://github.com/roku674)'s Copyright Header Check*  \n*☕ [Buy me a coffee](https://www.alexanderfields.me)*`
             });
+      
+      - name: Delete workflow after merge
+        if: |
+          github.event_name == 'push' && 
+          github.actor != 'github-actions[bot]' &&
+          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') &&
+          contains(github.event.head_commit.message, 'copyright')
+        run: |
+          echo "Detected copyright-related merge to main branch - deleting workflow"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Remove the workflow file
+          if [ -f ".github/workflows/copyright-check.yml" ]; then
+            git rm .github/workflows/copyright-check.yml
+            git commit -m "Remove copyright check workflow after merge"
+            git push origin ${{ github.ref_name }}
+            echo "Copyright workflow has been removed after successful merge"
+          fi
       
       - name: Clean up
         if: always()
