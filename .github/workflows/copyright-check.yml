@@ -31,28 +31,46 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          submodules: recursive
+      
+      - name: Update Copyright Workflow (if submodule)
+        run: |
+          # Check if we're in a submodule context by looking for CopyrightAdder directory
+          if [ -d "CopyrightAdder" ] || [ -d "Copyright" ]; then
+            echo "Detected submodule context - updating parent workflow"
+            
+            # Ensure .github/workflows directory exists
+            mkdir -p .github/workflows
+            
+            # Download latest workflow template
+            curl -sSL https://raw.githubusercontent.com/roku674/Copyright/main/CopyrightAdder/copyright-check-template.yml -o .github/workflows/copyright-check.yml.tmp
+            
+            # Check if workflow file exists and differs
+            if [ ! -f ".github/workflows/copyright-check.yml" ] || ! cmp -s ".github/workflows/copyright-check.yml" ".github/workflows/copyright-check.yml.tmp"; then
+              echo "Updating copyright-check.yml workflow"
+              mv .github/workflows/copyright-check.yml.tmp .github/workflows/copyright-check.yml
+              git add .github/workflows/copyright-check.yml
+            else
+              echo "Workflow is up to date"
+              rm .github/workflows/copyright-check.yml.tmp
+            fi
+            
+            # Note: sources.txt is project-specific and should not be auto-updated
+          fi
       
       - name: Setup Copyright Adder
         run: |
-          # Initialize submodules if not already done
-          git submodule update --init --recursive
-          
           # Check if CopyrightAdder exists as submodule, otherwise download
-          if [ -f "CopyrightAdder/add_copyright_headers.sh" ]; then
+          if [ -d "CopyrightAdder" ]; then
             echo "Using existing CopyrightAdder submodule"
             chmod +x CopyrightAdder/add_copyright_headers.sh
-          elif [ -f "Copyright/CopyrightAdder/add_copyright_headers.sh" ]; then
+          elif [ -d "Copyright/CopyrightAdder" ]; then
             echo "Using existing Copyright/CopyrightAdder submodule"
             chmod +x Copyright/CopyrightAdder/add_copyright_headers.sh
           else
-            echo "Downloading CopyrightAdder as fallback"
+            echo "Downloading CopyrightAdder"
             mkdir -p CopyrightAdder
-            curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/main/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh
-            # Use local sources.txt if available, otherwise download
-            if [ ! -f "sources.txt" ]; then
-              curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/main/sources.txt -o sources.txt
-            fi
+            curl -sSL https://raw.githubusercontent.com/roku674/Copyright/main/CopyrightAdder/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh
+            curl -sSL https://raw.githubusercontent.com/roku674/Copyright/main/CopyrightAdder/sources.txt -o CopyrightAdder/sources.txt
             chmod +x CopyrightAdder/add_copyright_headers.sh
           fi
       
@@ -63,24 +81,29 @@ jobs:
           files: |
             **/*.{java,js,ts,jsx,tsx,cpp,cc,c,h,cs,py,go,rs,rb,php,sh,yaml,yml,json,xml,html,sql}
       
-      - name: Run Copyright Adder
+      - name: Run Copyright Adder on changed files
         if: steps.changed-files.outputs.any_changed == 'true'
+        env:
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
-          echo "Adding copyright headers to repository files..."
+          echo "Adding copyright headers to changed files..."
           
           # Determine script path based on submodule structure
-          if [ -f "CopyrightAdder/add_copyright_headers.sh" ]; then
+          if [ -d "CopyrightAdder" ]; then
             SCRIPT_PATH="./CopyrightAdder/add_copyright_headers.sh"
-          elif [ -f "Copyright/CopyrightAdder/add_copyright_headers.sh" ]; then
+          elif [ -d "Copyright/CopyrightAdder" ]; then
             SCRIPT_PATH="./Copyright/CopyrightAdder/add_copyright_headers.sh"
           else
             echo "Error: Could not find CopyrightAdder script"
             exit 1
           fi
           
-          # Run the script on the entire repository
-          # The script will process all files based on sources.txt configuration
-          $SCRIPT_PATH
+          for file in $CHANGED_FILES; do
+            if [ -f "$file" ]; then
+              echo "Processing: $file"
+              $SCRIPT_PATH "$file"
+            fi
+          done
       
       - name: Check for changes
         id: check-changes
@@ -98,9 +121,20 @@ jobs:
             echo "All files have proper copyright headers."
           fi
       
+      - name: Check for workflow updates
+        id: check-workflow-updates
+        run: |
+          # Check if there are any workflow updates to commit
+          if [[ -n $(git status --porcelain .github/workflows/copyright-check.yml 2>/dev/null) ]]; then
+            echo "workflow_changes=true" >> $GITHUB_OUTPUT
+            echo "Workflow updates detected"
+          else
+            echo "workflow_changes=false" >> $GITHUB_OUTPUT
+            echo "No workflow updates needed"
+          fi
       
       - name: Create new branch for copyright headers
-        if: steps.check-changes.outputs.changes == 'true'
+        if: steps.check-changes.outputs.changes == 'true' || steps.check-workflow-updates.outputs.workflow_changes == 'true'
         id: create-branch
         run: |
           # Generate unique branch name
@@ -116,44 +150,94 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add -A
           
-          # Commit copyright header changes
-          git commit -m "Add copyright headers to source files"
+          # Create appropriate commit message based on what changed
+          if [[ "${{ steps.check-changes.outputs.changes }}" == "true" && "${{ steps.check-workflow-updates.outputs.workflow_changes }}" == "true" ]]; then
+            git commit -m "Add copyright headers and update workflow"
+          elif [[ "${{ steps.check-changes.outputs.changes }}" == "true" ]]; then
+            git commit -m "Add copyright headers to source files"
+          else
+            git commit -m "Update copyright workflow"
+          fi
           
           # Push the new branch
           git push origin "${NEW_BRANCH}"
       
       - name: Create Pull Request
-        if: steps.check-changes.outputs.changes == 'true'
+        if: steps.check-changes.outputs.changes == 'true' || steps.check-workflow-updates.outputs.workflow_changes == 'true'
         uses: actions/github-script@v7
         with:
           script: |
             const branchName = '${{ steps.create-branch.outputs.branch_name }}';
             const baseBranch = '${{ github.head_ref }}';
             const changedFiles = `${{ steps.check-changes.outputs.changed_files }}`;
+            const hasCodeChanges = '${{ steps.check-changes.outputs.changes }}' === 'true';
+            const hasWorkflowChanges = '${{ steps.check-workflow-updates.outputs.workflow_changes }}' === 'true';
             
-            const prBody = `## 📄 Copyright Headers Added
+            let prTitle = '';
+            let prBody = '';
             
-            This automated pull request adds missing copyright headers to source files in the \`${baseBranch}\` branch.
-            
-            ### 📝 Changed Files:
-            \`\`\`
-            ${changedFiles}
-            \`\`\`
-            
-            ### ℹ️ Notes:
-            - ✅ This PR was automatically generated by the Copyright Header Check workflow
-            - 👀 Please review the changes before merging
-            - 🎯 This PR targets the source branch \`${baseBranch}\`, not the base branch
-            
-            ---
-            *🤖 Generated by GitHub Actions*  
-            *🚀 Created by [@roku674](https://github.com/roku674)*  
-            *☕ [Buy me a coffee](https://www.alexanderfields.me)*`;
+            if (hasCodeChanges && hasWorkflowChanges) {
+              prTitle = `Add copyright headers and update workflow for ${baseBranch}`;
+              prBody = `## Copyright Headers Added + Workflow Updated
+              
+              This automated pull request adds missing copyright headers to source files and updates the copyright workflow in the \`${baseBranch}\` branch.
+              
+              ### Changed Files:
+              \`\`\`
+              ${changedFiles}
+              \`\`\`
+              
+              ### Updates:
+              - Added missing copyright headers to source files
+              - Updated .github/workflows/copyright-check.yml to latest version
+              
+              ### Notes:
+              - This PR was automatically generated by the Copyright Header Check workflow
+              - Please review the changes before merging
+              - This PR targets the source branch \`${baseBranch}\`, not the base branch
+              
+              ---
+              *Generated by GitHub Actions*`;
+            } else if (hasCodeChanges) {
+              prTitle = `Add copyright headers to ${baseBranch}`;
+              prBody = `## Copyright Headers Added
+              
+              This automated pull request adds missing copyright headers to source files in the \`${baseBranch}\` branch.
+              
+              ### Changed Files:
+              \`\`\`
+              ${changedFiles}
+              \`\`\`
+              
+              ### Notes:
+              - This PR was automatically generated by the Copyright Header Check workflow
+              - Please review the changes before merging
+              - This PR targets the source branch \`${baseBranch}\`, not the base branch
+              
+              ---
+              *Generated by GitHub Actions*`;
+            } else {
+              prTitle = `Update copyright workflow for ${baseBranch}`;
+              prBody = `## Copyright Workflow Updated
+              
+              This automated pull request updates the copyright workflow in the \`${baseBranch}\` branch.
+              
+              ### Updates:
+              - Updated .github/workflows/copyright-check.yml to latest version
+              
+              ### Notes:
+              - This PR was automatically generated by the Copyright Header Check workflow
+              - Please review the changes before merging
+              - This PR targets the source branch \`${baseBranch}\`, not the base branch
+              
+              ---
+              *Generated by GitHub Actions*`;
+            }
             
             const pr = await github.rest.pulls.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `📄 Add copyright headers to ${baseBranch}`,
+              title: prTitle,
               body: prBody,
               head: branchName,
               base: baseBranch,
@@ -167,7 +251,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `⚠️ **Missing Copyright Headers Detected**\n\n🤖 I've created PR #${pr.data.number} to add missing copyright headers to your branch.\n\n👀 Please review and merge it into your branch before this PR can be merged.\n\n---\n*Automated by [@roku674](https://github.com/roku674)'s Copyright Header Check*  \n*☕ [Buy me a coffee](https://www.alexanderfields.me)*`
+              body: `⚠️ **Missing Copyright Headers Detected**\n\nI've created PR #${pr.data.number} to add missing copyright headers to your branch. Please review and merge it into your branch before this PR can be merged.`
             });
       
       - name: Clean up
