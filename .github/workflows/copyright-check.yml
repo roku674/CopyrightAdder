@@ -51,8 +51,8 @@ jobs:
             mkdir -p CopyrightAdder
             
             # Download with verbose error checking
-            echo "Downloading from: https://raw.githubusercontent.com/roku674/CopyrightAdder/master/add_copyright_headers.sh"
-            if ! curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/master/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh; then
+            echo "Downloading from: https://raw.githubusercontent.com/roku674/CopyrightAdder/refs/heads/master/add_copyright_headers.sh"
+            if ! curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/refs/heads/master/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh; then
               echo "Failed to download add_copyright_headers.sh"
               # Check what we got
               head -n 5 CopyrightAdder/add_copyright_headers.sh
@@ -68,7 +68,7 @@ jobs:
             
             # Use local sources.txt if available, otherwise download
             if [ ! -f "sources.txt" ]; then
-              curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/master/sources.txt -o sources.txt
+              curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/refs/heads/master/sources.txt -o sources.txt
             fi
             chmod +x CopyrightAdder/add_copyright_headers.sh
           fi
