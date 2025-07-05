@@ -131,6 +131,58 @@ jobs:
             const baseBranch = '${{ github.head_ref }}';
             const changedFiles = `${{ steps.check-changes.outputs.changed_files }}`;
             
+            // First check for existing open PRs from copyright-headers/* branches to the same base branch
+            const existingPRs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              base: baseBranch
+            });
+            
+            // Look for existing copyright PRs targeting the same branch
+            const existingCopyrightPRs = existingPRs.data.filter(pr => 
+              pr.head.ref.startsWith('copyright-headers/') && 
+              pr.base.ref === baseBranch &&
+              pr.labels.some(label => label.name === 'copyright')
+            );
+            
+            if (existingCopyrightPRs.length > 0) {
+              console.log(`Found ${existingCopyrightPRs.length} existing copyright PR(s) for branch ${baseBranch}`);
+              
+              // Close all existing copyright PRs for this branch
+              for (const pr of existingCopyrightPRs) {
+                console.log(`Closing existing PR #${pr.number} (${pr.head.ref})`);
+                
+                // Add closing comment
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: `🔄 **Superseded by new copyright check**\n\nThis PR is being closed because a new copyright check has been triggered. A fresh PR will be created with the latest changes.`
+                });
+                
+                // Close the PR
+                await github.rest.pulls.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  state: 'closed'
+                });
+                
+                // Delete the branch if possible
+                try {
+                  await github.rest.git.deleteRef({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    ref: `heads/${pr.head.ref}`
+                  });
+                  console.log(`Deleted branch ${pr.head.ref}`);
+                } catch (error) {
+                  console.log(`Could not delete branch ${pr.head.ref}: ${error.message}`);
+                }
+              }
+            }
+            
             const prBody = `## 📄 Copyright Headers Added
             
             This automated pull request adds missing copyright headers to source files in the \`${baseBranch}\` branch.
