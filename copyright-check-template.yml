@@ -222,7 +222,7 @@ jobs:
               body: prBody,
               head: branchName,
               base: baseBranch,
-              labels: ['copyright', 'automated']
+              labels: ['copyright', 'automated', 'github-actions', 'documentation']
             });
             
             console.log(`Created PR #${pr.data.number}: ${pr.data.html_url}`);
