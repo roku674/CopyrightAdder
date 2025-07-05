@@ -107,3 +107,6 @@ EXCLUDE_FILE_10=.eslintrc.yml
 EXCLUDE_FILE_11=eslint.config.js
 EXCLUDE_FILE_12=eslint.config.mjs
 EXCLUDE_FILE_13=eslint.config.cjs
+EXCLUDE_FILE_14=add_copyright_headers.sh
+EXCLUDE_FILE_15=add_copyright_headers.bat
+EXCLUDE_FILE_16=apply_copyright_to_repos.sh
