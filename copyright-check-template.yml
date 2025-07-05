@@ -50,10 +50,10 @@ jobs:
           else
             echo "Downloading CopyrightAdder as fallback"
             mkdir -p CopyrightAdder
-            curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/main/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh
+            curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/master/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh
             # Use local sources.txt if available, otherwise download
             if [ ! -f "sources.txt" ]; then
-              curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/main/sources.txt -o sources.txt
+              curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/master/sources.txt -o sources.txt
             fi
             chmod +x CopyrightAdder/add_copyright_headers.sh
           fi
