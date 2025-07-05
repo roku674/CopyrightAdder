@@ -49,10 +49,26 @@ jobs:
           else
             echo "Downloading CopyrightAdder as fallback"
             mkdir -p CopyrightAdder
-            curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/main/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh
+            
+            # Download with verbose error checking
+            echo "Downloading from: https://raw.githubusercontent.com/roku674/CopyrightAdder/refs/heads/master/add_copyright_headers.sh"
+            if ! curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/refs/heads/master/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh; then
+              echo "Failed to download add_copyright_headers.sh"
+              # Check what we got
+              head -n 5 CopyrightAdder/add_copyright_headers.sh
+              exit 1
+            fi
+            
+            # Verify the downloaded file is a shell script
+            if ! head -n 1 CopyrightAdder/add_copyright_headers.sh | grep -q "^#" ; then
+              echo "Downloaded file does not appear to be a shell script. First few lines:"
+              head -n 5 CopyrightAdder/add_copyright_headers.sh
+              exit 1
+            fi
+            
             # Use local sources.txt if available, otherwise download
             if [ ! -f "sources.txt" ]; then
-              curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/main/sources.txt -o sources.txt
+              curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/refs/heads/master/sources.txt -o sources.txt
             fi
             chmod +x CopyrightAdder/add_copyright_headers.sh
           fi
