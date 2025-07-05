@@ -237,7 +237,7 @@ add_copyright_header() {
             comment_style="//"
             ;;
         # Hash comments
-        py|rb|sh|bash|zsh|pl|r|jl|nim|cr|ex|exs|yaml|yml|toml)
+        py|rb|sh|bash|zsh|pl|r|jl|nim|cr|ex|exs|toml)
             comment_style="#"
             ;;
         # XML/HTML style
