@@ -91,6 +91,10 @@ jobs:
         with:
           files: |
             **/*.{java,js,ts,jsx,tsx,cpp,cc,c,h,cs,py,go,rs,rb,php,sh,xml,html,sql}
+          files_ignore: |
+            CopyrightAdder/**
+            Copyright/**
+            .github/**
       
       - name: Run Copyright Adder on changed files
         if: steps.changed-files.outputs.any_changed == 'true'
