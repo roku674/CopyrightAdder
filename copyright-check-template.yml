@@ -122,17 +122,24 @@ jobs:
           ORIGINAL_AUTHOR_NAME="${{ github.event.pull_request.user.login }}"
           ORIGINAL_AUTHOR_EMAIL="${{ github.event.pull_request.user.email }}"
           
+          echo "DEBUG: Initial PR author name: $ORIGINAL_AUTHOR_NAME"
+          echo "DEBUG: Initial PR author email: $ORIGINAL_AUTHOR_EMAIL"
+          
           # If email is not available from PR, try to get it from the commit
           if [ -z "$ORIGINAL_AUTHOR_EMAIL" ] || [ "$ORIGINAL_AUTHOR_EMAIL" = "null" ]; then
             # Get email from the most recent commit in the PR
             ORIGINAL_AUTHOR_EMAIL=$(git log -1 --format='%ae' ${{ github.event.pull_request.head.sha }})
             ORIGINAL_AUTHOR_NAME=$(git log -1 --format='%an' ${{ github.event.pull_request.head.sha }})
+            echo "DEBUG: Got from git log - name: $ORIGINAL_AUTHOR_NAME, email: $ORIGINAL_AUTHOR_EMAIL"
           fi
           
           # Fallback to a reasonable default if still not available
           if [ -z "$ORIGINAL_AUTHOR_EMAIL" ] || [ "$ORIGINAL_AUTHOR_EMAIL" = "null" ]; then
             ORIGINAL_AUTHOR_EMAIL="${ORIGINAL_AUTHOR_NAME}@users.noreply.github.com"
+            echo "DEBUG: Using fallback email: $ORIGINAL_AUTHOR_EMAIL"
           fi
+          
+          echo "DEBUG: Final author - name: $ORIGINAL_AUTHOR_NAME, email: $ORIGINAL_AUTHOR_EMAIL"
           
           # Set git config to use the original author's identity
           git config --local user.email "$ORIGINAL_AUTHOR_EMAIL"

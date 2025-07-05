@@ -77,16 +77,29 @@ get_git_author_info() {
     local file="$1"
     local info=""
     
-    # Get the first commit that created this file with full timestamp
-    info=$(git log --diff-filter=A --follow --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | tail -1)
+    # Get the first commit that created this file with full timestamp, excluding bot commits
+    info=$(git log --diff-filter=A --follow --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
+           grep -v "github-actions\[bot\]" | \
+           grep -v "dependabot\[bot\]" | \
+           tail -1)
     
     if [ -z "$info" ]; then
         # If file not in git history yet, try to get current git user
         local current_author=$(git config user.name 2>/dev/null || echo "Unknown")
         local current_email=$(git config user.email 2>/dev/null || echo "unknown@unknown.com")
-        local current_year=$(date +%Y)
-        local current_timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-        info="$current_author|$current_email|$current_year|$current_timestamp"
+        
+        # Skip if current user is a bot
+        if [[ "$current_author" == *"[bot]"* ]]; then
+            # Try to get from environment or previous commits
+            info=$(git log --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' 2>/dev/null | \
+                   grep -v "github-actions\[bot\]" | \
+                   grep -v "dependabot\[bot\]" | \
+                   head -1)
+        else
+            local current_year=$(date +%Y)
+            local current_timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+            info="$current_author|$current_email|$current_year|$current_timestamp"
+        fi
     fi
     
     echo "$info"
@@ -171,8 +184,11 @@ add_copyright_header() {
     # Format the author
     formatted_author=$(format_author "$author_name" "$author_email")
     
-    # Get last editor info from git
-    editor_info=$(git log -1 --format='%an|%ae|%ad' --date=format:'%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null)
+    # Get last editor info from git, excluding bot commits
+    editor_info=$(git log --format='%an|%ae|%ad' --date=format:'%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
+                  grep -v "github-actions\[bot\]" | \
+                  grep -v "dependabot\[bot\]" | \
+                  head -1)
     if [ -n "$editor_info" ]; then
         IFS='|' read -r editor_name editor_email editor_date <<< "$editor_info"
         formatted_editor=$(format_author "$editor_name" "$editor_email")
