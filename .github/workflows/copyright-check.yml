@@ -31,25 +31,20 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: recursive
       
       - name: Setup Copyright Adder
         run: |
-          # Create CopyrightAdder directory
-          mkdir -p CopyrightAdder
-          
-          # Download the copyright script
-          curl -sSL https://raw.githubusercontent.com/roku674/Copyright/main/CopyrightAdder/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh
-          
-          # Copy local sources.txt to CopyrightAdder directory
-          if [ -f "sources.txt" ]; then
-            cp sources.txt CopyrightAdder/sources.txt
-          else
-            echo "Error: sources.txt not found in repository root"
-            exit 1
-          fi
+          # Initialize submodules
+          git submodule update --init --recursive
           
           # Make script executable
           chmod +x CopyrightAdder/add_copyright_headers.sh
+          
+          # Copy the local sources.txt to override the submodule's version
+          if [ -f sources.txt ]; then
+            cp sources.txt CopyrightAdder/sources.txt
+          fi
       
       - name: Get changed files
         id: changed-files
@@ -60,16 +55,10 @@ jobs:
       
       - name: Run Copyright Adder on changed files
         if: steps.changed-files.outputs.any_changed == 'true'
-        env:
-          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
           echo "Adding copyright headers to changed files..."
-          for file in $CHANGED_FILES; do
-            if [ -f "$file" ]; then
-              echo "Processing: $file"
-              ./CopyrightAdder/add_copyright_headers.sh "$file"
-            fi
-          done
+          # The script processes all files in the repository
+          ./CopyrightAdder/add_copyright_headers.sh
       
       - name: Check for changes
         id: check-changes
