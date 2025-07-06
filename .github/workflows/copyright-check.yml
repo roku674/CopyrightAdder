@@ -6,7 +6,7 @@ name: Copyright Header Check
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches: [develop, master, main]
+    branches: [develop, development, master, main]
 
 jobs:
   copyright-check:
