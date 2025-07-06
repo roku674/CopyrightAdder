@@ -1,6 +1,35 @@
+# Copyright © Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-02 09:35:27
 # Universal Copyright Header Script for Windows PowerShell
 # Automatically adds copyright headers with correct attribution based on git history
 # Works with any git repository
+
+# Parse command line arguments
+param(
+    [Parameter(Position=0)]
+    [string]$SingleFile = "",
+    
+    [Parameter()]
+    [Alias("j")]
+    [int]$Jobs = 8,
+    
+    [Parameter()]
+    [Alias("h")]
+    [switch]$Help
+)
+
+# Show help if requested
+if ($Help) {
+    Write-Host "Usage: add_copyright_headers.ps1 [file] [-Jobs <n>] [-Help]"
+    Write-Host ""
+    Write-Host "Options:"
+    Write-Host "  file        Process a single file instead of entire directory"
+    Write-Host "  -Jobs, -j   Number of parallel jobs (default: 8)"
+    Write-Host "  -Help, -h   Show this help message"
+    exit 0
+}
+
+# Set maximum parallel jobs
+$script:MaxParallelJobs = $Jobs
 
 # Function to read configuration from sources.txt
 function Read-Config {
@@ -25,6 +54,7 @@ function Read-Config {
     $script:SpecialAuthors = @()
     $script:ExcludeDirs = @()
     $script:FileExtensions = @()
+    $script:ExcludeFiles = @()
     
     # Read configuration values
     Get-Content $configFile | ForEach-Object {
@@ -66,6 +96,11 @@ function Read-Config {
                 '^FILE_EXT_\d+$' {
                     if ($value) {
                         $script:FileExtensions += $value
+                    }
+                }
+                '^EXCLUDE_FILE_\d+$' {
+                    if ($value) {
+                        $script:ExcludeFiles += $value
                     }
                 }
             }
@@ -223,8 +258,20 @@ function Add-CopyrightHeader {
     # Format the author
     $formattedAuthor = Format-Author -AuthorName $authorName -AuthorEmail $authorEmail
     
-    # Get last editor info from git
-    $editorLog = git log -1 --format='%an|%ae|%ad' --date=format:'%Y-%m-%d %H:%M:%S' -- "$FilePath" 2>$null
+    # Get last editor info from git, excluding bot commits
+    $sourceBranch = $env:SOURCE_BRANCH
+    if ($sourceBranch) {
+        # Get editor info from source branch
+        $editorLog = git log "$sourceBranch" --format='%an|%ae|%ad' --date=format:'%Y-%m-%d %H:%M:%S' -- "$FilePath" 2>$null | 
+                     Where-Object { $_ -notmatch "github-actions\[bot\]" -and $_ -notmatch "dependabot\[bot\]" } | 
+                     Select-Object -First 1
+    } else {
+        # Get from current branch
+        $editorLog = git log --format='%an|%ae|%ad' --date=format:'%Y-%m-%d %H:%M:%S' -- "$FilePath" 2>$null | 
+                     Where-Object { $_ -notmatch "github-actions\[bot\]" -and $_ -notmatch "dependabot\[bot\]" } | 
+                     Select-Object -First 1
+    }
+    
     $editorName = $null
     $editorEmail = $null
     $editorDate = $null
@@ -407,6 +454,14 @@ function Find-SourceFiles {
                 $skip = $true
             }
             
+            # Check if file is in excluded files list
+            foreach ($excludeFile in $script:ExcludeFiles) {
+                if ($file.Name -eq $excludeFile -or $file.FullName -like "*$excludeFile*") {
+                    $skip = $true
+                    break
+                }
+            }
+            
             if (-not $skip) {
                 $files += $file
             }
@@ -450,6 +505,19 @@ function Find-GitRepos {
 
 # Main execution
 function Main {
+    # Check if single file mode
+    if ($SingleFile) {
+        if (Test-Path $SingleFile) {
+            Write-Host "Processing single file: $SingleFile"
+            Add-CopyrightHeader -FilePath $SingleFile
+            Write-Host "Copyright header added successfully!" -ForegroundColor Green
+        } else {
+            Write-Host "Error: File not found: $SingleFile" -ForegroundColor Red
+            exit 1
+        }
+        return
+    }
+    
     # Check if we're in a git repository
     $inGitRepo = $false
     try {
