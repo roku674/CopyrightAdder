@@ -1,13 +1,56 @@
 @echo off
 setlocal enabledelayedexpansion
 
+REM Copyright © Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-02 09:35:27
 REM Universal Copyright Header Script for Windows
 REM Automatically adds copyright headers with correct attribution based on git history
 REM Works with any git repository
 
+REM Parse command line arguments
+set "SINGLE_FILE="
+set "MAX_JOBS=8"
+set "SHOW_HELP=0"
+
+:parse_args
+if "%~1"=="" goto end_parse
+if /i "%~1"=="-h" set "SHOW_HELP=1" & goto next_arg
+if /i "%~1"=="--help" set "SHOW_HELP=1" & goto next_arg
+if /i "%~1"=="-j" set "MAX_JOBS=%~2" & shift & goto next_arg
+if /i "%~1"=="--jobs" set "MAX_JOBS=%~2" & shift & goto next_arg
+REM Check if it's a file
+if exist "%~1" set "SINGLE_FILE=%~1"
+:next_arg
+shift
+goto parse_args
+:end_parse
+
+REM Show help if requested
+if %SHOW_HELP%==1 (
+    echo Usage: add_copyright_headers.bat [file] [-j ^<n^>] [-h]
+    echo.
+    echo Options:
+    echo   file        Process a single file instead of entire directory
+    echo   -j, --jobs  Number of parallel jobs ^(default: 8^) - Note: Limited in batch
+    echo   -h, --help  Show this help message
+    exit /b 0
+)
+
 REM Load configuration from sources.txt
 call :load_config
 if errorlevel 1 exit /b 1
+
+REM Check if single file mode
+if not "%SINGLE_FILE%"=="" (
+    if exist "%SINGLE_FILE%" (
+        echo Processing single file: %SINGLE_FILE%
+        call :add_copyright_header "%SINGLE_FILE%"
+        echo Copyright header added successfully!
+        exit /b 0
+    ) else (
+        echo Error: File not found: %SINGLE_FILE%
+        exit /b 1
+    )
+)
 
 REM Check if we're in a git repository
 git rev-parse --git-dir >nul 2>&1
@@ -100,6 +143,7 @@ set "RIGHTS_STATEMENT="
 set "special_count=0"
 set "exclude_count=0"
 set "ext_count=0"
+set "exclude_file_count=0"
 
 REM Read configuration
 for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^| findstr /v "^$"') do (
@@ -139,6 +183,15 @@ for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^|
             set /a ext_count+=1
         )
     )
+    
+    REM Exclude files
+    echo !key! | findstr /b "EXCLUDE_FILE_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "EXCLUDE_FILES[!exclude_file_count!]=!value!"
+            set /a exclude_file_count+=1
+        )
+    )
 )
 
 REM Set defaults if not configured
@@ -176,6 +229,14 @@ for /l %%i in (0,1,%ext_count%) do (
             REM Skip migrations
             echo %%F | findstr /i "migrations" >nul
             if not errorlevel 1 set "skip_file=1"
+            
+            REM Check exclude files
+            for /l %%k in (0,1,%exclude_file_count%) do (
+                if defined EXCLUDE_FILES[%%k] (
+                    echo %%~nxF | findstr /i "!EXCLUDE_FILES[%%k]!" >nul
+                    if not errorlevel 1 set "skip_file=1"
+                )
+            )
             
             if !skip_file!==0 (
                 call :process_file "%%F"
@@ -260,6 +321,7 @@ set "RIGHTS_STATEMENT="
 set "special_count=0"
 set "exclude_count=0"
 set "ext_count=0"
+set "exclude_file_count=0"
 
 REM Read configuration
 for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^| findstr /v "^$"') do (
@@ -299,6 +361,15 @@ for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^|
             set /a ext_count+=1
         )
     )
+    
+    REM Exclude files
+    echo !key! | findstr /b "EXCLUDE_FILE_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "EXCLUDE_FILES[!exclude_file_count!]=!value!"
+            set /a exclude_file_count+=1
+        )
+    )
 )
 
 REM Set defaults if not configured
@@ -336,6 +407,14 @@ for /l %%i in (0,1,%ext_count%) do (
             REM Skip migrations
             echo %%F | findstr /i "migrations" >nul
             if not errorlevel 1 set "skip_file=1"
+            
+            REM Check exclude files
+            for /l %%k in (0,1,%exclude_file_count%) do (
+                if defined EXCLUDE_FILES[%%k] (
+                    echo %%~nxF | findstr /i "!EXCLUDE_FILES[%%k]!" >nul
+                    if not errorlevel 1 set "skip_file=1"
+                )
+            )
             
             if !skip_file!==0 (
                 call :process_file "%%F"
@@ -386,9 +465,15 @@ REM Format author with special handling
 set "formatted_author=!author_name!"
 call :format_author "!author_name!" "!author_email!"
 
-REM Get last editor info from git
+REM Get last editor info from git, excluding bot commits
 set "editor_info="
-for /f "tokens=*" %%i in ('git log -1 --format="%%an^|%%ae^|%%ad" --date=format:"%%Y-%%m-%%d %%H:%%M:%%S" -- "%file%" 2^>nul') do set "editor_info=%%i"
+if defined SOURCE_BRANCH (
+    REM Get editor info from source branch
+    for /f "tokens=*" %%i in ('git log "%SOURCE_BRANCH%" --format="%%an^|%%ae^|%%ad" --date=format:"%%Y-%%m-%%d %%H:%%M:%%S" -- "%file%" 2^>nul ^| findstr /v "github-actions\[bot\]" ^| findstr /v "dependabot\[bot\]" ^| head -1') do set "editor_info=%%i"
+) else (
+    REM Get from current branch
+    for /f "tokens=*" %%i in ('git log --format="%%an^|%%ae^|%%ad" --date=format:"%%Y-%%m-%%d %%H:%%M:%%S" -- "%file%" 2^>nul ^| findstr /v "github-actions\[bot\]" ^| findstr /v "dependabot\[bot\]" ^| head -1') do set "editor_info=%%i"
+)
 
 if not "!editor_info!"=="" (
     REM Parse editor info
@@ -553,6 +638,7 @@ set "RIGHTS_STATEMENT="
 set "special_count=0"
 set "exclude_count=0"
 set "ext_count=0"
+set "exclude_file_count=0"
 
 REM Read configuration
 for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^| findstr /v "^$"') do (
@@ -592,6 +678,15 @@ for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^|
             set /a ext_count+=1
         )
     )
+    
+    REM Exclude files
+    echo !key! | findstr /b "EXCLUDE_FILE_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "EXCLUDE_FILES[!exclude_file_count!]=!value!"
+            set /a exclude_file_count+=1
+        )
+    )
 )
 
 REM Set defaults if not configured
@@ -629,6 +724,14 @@ for /l %%i in (0,1,%ext_count%) do (
             REM Skip migrations
             echo %%F | findstr /i "migrations" >nul
             if not errorlevel 1 set "skip_file=1"
+            
+            REM Check exclude files
+            for /l %%k in (0,1,%exclude_file_count%) do (
+                if defined EXCLUDE_FILES[%%k] (
+                    echo %%~nxF | findstr /i "!EXCLUDE_FILES[%%k]!" >nul
+                    if not errorlevel 1 set "skip_file=1"
+                )
+            )
             
             if !skip_file!==0 (
                 call :process_file "%%F"
@@ -675,6 +778,7 @@ set "RIGHTS_STATEMENT="
 set "special_count=0"
 set "exclude_count=0"
 set "ext_count=0"
+set "exclude_file_count=0"
 
 REM Read configuration
 for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^| findstr /v "^$"') do (
@@ -714,6 +818,15 @@ for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^|
             set /a ext_count+=1
         )
     )
+    
+    REM Exclude files
+    echo !key! | findstr /b "EXCLUDE_FILE_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "EXCLUDE_FILES[!exclude_file_count!]=!value!"
+            set /a exclude_file_count+=1
+        )
+    )
 )
 
 REM Set defaults if not configured
@@ -751,6 +864,14 @@ for /l %%i in (0,1,%ext_count%) do (
             REM Skip migrations
             echo %%F | findstr /i "migrations" >nul
             if not errorlevel 1 set "skip_file=1"
+            
+            REM Check exclude files
+            for /l %%k in (0,1,%exclude_file_count%) do (
+                if defined EXCLUDE_FILES[%%k] (
+                    echo %%~nxF | findstr /i "!EXCLUDE_FILES[%%k]!" >nul
+                    if not errorlevel 1 set "skip_file=1"
+                )
+            )
             
             if !skip_file!==0 (
                 call :process_file "%%F"
@@ -788,6 +909,7 @@ set "RIGHTS_STATEMENT="
 set "special_count=0"
 set "exclude_count=0"
 set "ext_count=0"
+set "exclude_file_count=0"
 
 REM Read configuration
 for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^| findstr /v "^$"') do (
@@ -827,6 +949,15 @@ for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^|
             set /a ext_count+=1
         )
     )
+    
+    REM Exclude files
+    echo !key! | findstr /b "EXCLUDE_FILE_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "EXCLUDE_FILES[!exclude_file_count!]=!value!"
+            set /a exclude_file_count+=1
+        )
+    )
 )
 
 REM Set defaults if not configured
@@ -864,6 +995,14 @@ for /l %%i in (0,1,%ext_count%) do (
             REM Skip migrations
             echo %%F | findstr /i "migrations" >nul
             if not errorlevel 1 set "skip_file=1"
+            
+            REM Check exclude files
+            for /l %%k in (0,1,%exclude_file_count%) do (
+                if defined EXCLUDE_FILES[%%k] (
+                    echo %%~nxF | findstr /i "!EXCLUDE_FILES[%%k]!" >nul
+                    if not errorlevel 1 set "skip_file=1"
+                )
+            )
             
             if !skip_file!==0 (
                 call :process_file "%%F"
@@ -900,6 +1039,7 @@ set "RIGHTS_STATEMENT="
 set "special_count=0"
 set "exclude_count=0"
 set "ext_count=0"
+set "exclude_file_count=0"
 
 REM Read configuration
 for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^| findstr /v "^$"') do (
@@ -939,6 +1079,15 @@ for /f "tokens=1,* delims==" %%a in ('type "%config_file%" ^| findstr /v "^#" ^|
             set /a ext_count+=1
         )
     )
+    
+    REM Exclude files
+    echo !key! | findstr /b "EXCLUDE_FILE_" >nul
+    if not errorlevel 1 (
+        if not "!value!"=="" (
+            set "EXCLUDE_FILES[!exclude_file_count!]=!value!"
+            set /a exclude_file_count+=1
+        )
+    )
 )
 
 REM Set defaults if not configured
@@ -976,6 +1125,14 @@ for /l %%i in (0,1,%ext_count%) do (
             REM Skip migrations
             echo %%F | findstr /i "migrations" >nul
             if not errorlevel 1 set "skip_file=1"
+            
+            REM Check exclude files
+            for /l %%k in (0,1,%exclude_file_count%) do (
+                if defined EXCLUDE_FILES[%%k] (
+                    echo %%~nxF | findstr /i "!EXCLUDE_FILES[%%k]!" >nul
+                    if not errorlevel 1 set "skip_file=1"
+                )
+            )
             
             if !skip_file!==0 (
                 call :process_file "%%F"

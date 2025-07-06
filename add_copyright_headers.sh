@@ -333,22 +333,39 @@ add_copyright_header() {
         # Check if file already has a copyright header in the first 10 lines
         if head -n 10 "$file" | grep -q "Copyright.*©.*$COMPANY_NAME\|Copyright.*$COMPANY_NAME"; then
             echo "File already has copyright header, updating: $file"
-            # Create temp file without old copyright and edited by lines
+            # Create temp file and extract existing edited by lines
             temp_file=$(mktemp)
-            awk '
+            existing_edited_lines=$(mktemp)
+            
+            # Extract existing "Edited by" lines but exclude the current editor if they're the same person
+            awk -v current_editor="$formatted_editor" '
                 BEGIN {line_count=0} 
                 {line_count++}
-                line_count <= 15 && ($0 ~ /Copyright/ || $0 ~ /Edited by/) {next}
+                line_count <= 15 && $0 ~ /Edited by/ {
+                    # Check if this edited by line is for the same person as current editor
+                    if (index($0, current_editor) == 0) {
+                        print $0 > "'$existing_edited_lines'"
+                    }
+                    next
+                }
+                line_count <= 15 && $0 ~ /Copyright/ {next}
                 {print}
             ' "$file" > "$temp_file"
             
             # Add new headers and rest of file
             echo "$header" > "$file"
+            # Add existing edited by lines from other people
+            if [ -s "$existing_edited_lines" ]; then
+                while IFS= read -r line; do
+                    echo "$line" >> "$file"
+                done < "$existing_edited_lines"
+            fi
+            # Add current editor's edited by line if different from author
             if [ -n "$header2" ]; then
                 echo "$header2" >> "$file"
             fi
             cat "$temp_file" >> "$file"
-            rm "$temp_file"
+            rm "$temp_file" "$existing_edited_lines"
         else
             # Add new copyright headers at the beginning
             temp_file=$(mktemp)

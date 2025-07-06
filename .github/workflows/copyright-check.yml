@@ -269,10 +269,15 @@ jobs:
       - name: Delete workflow after merge
         if: |
           github.event_name == 'push' && 
+          github.actor != 'github-actions[bot]' &&
           (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') &&
-          contains(github.event.head_commit.message, 'copyright')
+          (contains(github.event.head_commit.message, 'copyright') || contains(github.event.head_commit.message, 'Copyright'))
         run: |
           echo "Detected copyright-related merge to main branch - deleting workflow"
+          
+          # Use bot identity for workflow cleanup
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           
           # Remove the workflow file
           if [ -f ".github/workflows/copyright-check.yml" ]; then
@@ -281,6 +286,15 @@ jobs:
             git push origin ${{ github.ref_name }}
             echo "Copyright workflow has been removed after successful merge"
           fi
+          
+          # Also clean up any remaining copyright-headers branches
+          echo "Cleaning up copyright-headers branches..."
+          git branch -r | grep "origin/copyright-headers/" | sed 's/origin\///' | while read branch; do
+            if [ -n "$branch" ]; then
+              echo "Deleting remote branch: $branch"
+              git push origin --delete "$branch" || true
+            fi
+          done
       
       - name: Clean up
         if: always()
