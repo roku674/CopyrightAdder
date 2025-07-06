@@ -120,6 +120,14 @@ jobs:
             fi
           done
       
+      - name: Clean up downloaded CopyrightAdder
+        run: |
+          # Remove the downloaded CopyrightAdder directory to prevent it from being committed
+          if [ -d "CopyrightAdder" ] && [ ! -d "CopyrightAdder/.git" ]; then
+            echo "Removing downloaded CopyrightAdder directory"
+            rm -rf CopyrightAdder
+          fi
+      
       - name: Check for changes
         id: check-changes
         run: |
