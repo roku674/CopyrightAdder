@@ -120,12 +120,17 @@ jobs:
             fi
           done
       
-      - name: Clean up downloaded CopyrightAdder
+      - name: Clean up downloaded script files
         run: |
-          # Remove the downloaded CopyrightAdder directory to prevent it from being committed
-          if [ -d "CopyrightAdder" ] && [ ! -d "CopyrightAdder/.git" ]; then
-            echo "Removing downloaded CopyrightAdder directory"
-            rm -rf CopyrightAdder
+          # Remove downloaded script files to prevent them from being committed
+          if [ -f "CopyrightAdder/add_copyright_headers.sh" ] && [ ! -d "CopyrightAdder/.git" ]; then
+            echo "Removing downloaded script files"
+            rm -f CopyrightAdder/add_copyright_headers.sh
+            rm -f sources.txt
+            # Remove the directory if it's empty and was created by us
+            if [ -d "CopyrightAdder" ] && [ -z "$(ls -A CopyrightAdder)" ]; then
+              rmdir CopyrightAdder
+            fi
           fi
       
       - name: Check for changes
