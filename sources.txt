@@ -42,6 +42,7 @@ EXCLUDE_DIR_22=virtualenv
 EXCLUDE_DIR_23=.github
 EXCLUDE_DIR_24=CopyrightAdder
 EXCLUDE_DIR_25=Copyright
+EXCLUDE_DIR_26=workflows
 
 # File extensions to process
 # C-style comments
