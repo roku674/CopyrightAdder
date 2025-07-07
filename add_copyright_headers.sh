@@ -473,6 +473,18 @@ process_single_repo() {
     echo "Total files to check: $total_files"
     echo ""
     
+    # Check if there are any files to process
+    if [ $total_files -eq 0 ]; then
+        echo "No source files found to process in $repo_path"
+        echo "This could mean:"
+        echo "  - All files already have copyright headers"
+        echo "  - No files match the configured extensions in sources.txt"
+        echo "  - All files are in excluded directories"
+        echo ""
+        echo "✅ Copyright check completed successfully - no files needed processing"
+        return 0
+    fi
+    
     # Process each directory's files in parallel
     for dir in "${directories[@]}"; do
         process_directory_files "$dir"
@@ -484,7 +496,7 @@ process_single_repo() {
     wait
     
     echo ""
-    echo "Copyright headers added successfully for $repo_path!"
+    echo "Copyright headers processing completed for $repo_path!"
     echo ""
 }
 
