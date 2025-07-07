@@ -111,3 +111,4 @@ EXCLUDE_FILE_13=eslint.config.cjs
 EXCLUDE_FILE_14=add_copyright_headers.sh
 EXCLUDE_FILE_15=add_copyright_headers.bat
 EXCLUDE_FILE_16=apply_copyright_to_repos.sh
+EXCLUDE_FILE_17=yarn.lock

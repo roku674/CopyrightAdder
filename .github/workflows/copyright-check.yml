@@ -6,7 +6,7 @@ name: Copyright Header Check
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches: [develop, master, main]
+    branches: [develop, development, dev, master, main, default]
 
 jobs:
   copyright-check:
@@ -28,8 +28,8 @@ jobs:
       !contains(github.event.pull_request.title, 'Copyright Additions') &&
       !contains(github.event.pull_request.title, 'Copyright Headers') &&
       !contains(github.event.pull_request.title, 'Copyright Workflow') &&
-      !(contains(fromJSON('["develop", "master", "main", "dev", "development"]'), github.head_ref) && 
-        contains(fromJSON('["develop", "master", "main", "dev", "development"]'), github.base_ref))
+      !(contains(fromJSON('["develop", "master", "main", "dev", "development", "default"]'), github.head_ref) && 
+        contains(fromJSON('["develop", "master", "main", "dev", "development", "default"]'), github.base_ref))
     permissions:
       contents: write
       pull-requests: write
