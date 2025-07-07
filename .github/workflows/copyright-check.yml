@@ -6,12 +6,7 @@ name: Copyright Header Check
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-<<<<<<< HEAD
-    branches: [develop, development, master, main]
-=======
     branches: [develop, development, dev, master, main, default]
->>>>>>> e4e08d3c3e5996d38b332ffe47626e2dbdba2d7e
-
 jobs:
   copyright-check:
     runs-on: ubuntu-latest
