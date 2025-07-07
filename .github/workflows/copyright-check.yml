@@ -7,7 +7,6 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [develop, development, dev, master, main, default]
-
 jobs:
   copyright-check:
     runs-on: ubuntu-latest
