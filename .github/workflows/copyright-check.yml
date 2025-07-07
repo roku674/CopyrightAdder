@@ -6,7 +6,7 @@ name: Copyright Header Check
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches: [develop, master, main]
+    branches: [develop, development, dev, master, main, default]
 
 jobs:
   copyright-check:
@@ -17,7 +17,7 @@ jobs:
     # 3. PR is from a copyright-headers branch (prevent infinite loops)
     # 4. PR author is any bot (contains [bot] in username)
     # 5. PR title contains copyright-related keywords (prevent re-processing)
-    # 6. PR is merging between protected branches (develop/master/main)
+    # 6. PR is merging between protected branches (develop/master/main/dev/development/default)
     if: |
       github.actor != 'github-actions[bot]' && 
       github.actor != 'dependabot[bot]' &&
@@ -28,8 +28,8 @@ jobs:
       !contains(github.event.pull_request.title, 'Copyright Additions') &&
       !contains(github.event.pull_request.title, 'Copyright Headers') &&
       !contains(github.event.pull_request.title, 'Copyright Workflow') &&
-      !(contains(fromJSON('["develop", "master", "main", "dev", "development"]'), github.head_ref) && 
-        contains(fromJSON('["develop", "master", "main", "dev", "development"]'), github.base_ref))
+      !(contains(fromJSON('["develop", "master", "main", "dev", "development", "default"]'), github.head_ref) && 
+        contains(fromJSON('["develop", "master", "main", "dev", "development", "default"]'), github.base_ref))
     permissions:
       contents: write
       pull-requests: write
@@ -96,7 +96,7 @@ jobs:
       
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v40
+        uses: tj-actions/changed-files@v46
         with:
           files: |
             **/*.{java,js,ts,jsx,tsx,cpp,cc,c,h,cs,py,go,rs,rb,php,sh,xml,html,sql}
