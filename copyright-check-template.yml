@@ -81,11 +81,17 @@ jobs:
             .github/**
       
       - name: Run Copyright Adder on changed files
-        if: steps.changed-files.outputs.any_changed == 'true'
         env:
           CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
           SOURCE_BRANCH: ${{ github.head_ref }}
         run: |
+          # Check if there are any changed files
+          if [ "${{ steps.changed-files.outputs.any_changed }}" != "true" ]; then
+            echo "✅ No source files were changed in this PR."
+            echo "No copyright headers need to be added."
+            exit 0
+          fi
+          
           echo "Adding copyright headers to changed files..."
           echo "Using source branch: $SOURCE_BRANCH for git history"
           
