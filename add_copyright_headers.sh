@@ -186,21 +186,17 @@ get_git_author_info() {
     fi
 
     if [ -z "$info" ]; then
-        # If file not in git history yet (new file), get PR author from environment
-        # GitHub Actions sets these variables
-        if [ -n "${GITHUB_ACTOR}" ] && [ "${GITHUB_ACTOR}" != "github-actions[bot]" ]; then
-            local pr_author="${GITHUB_ACTOR}"
-            local pr_email="${GITHUB_ACTOR_EMAIL:-${pr_author}@users.noreply.github.com}"
-            local current_year=$(date +%Y)
-            local current_timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-            info="${pr_author}|${pr_email}|${current_year}|${current_timestamp}"
-        else
-            # Last resort: get from recent commits (not current config which might be bot)
-            info=$(git log --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' 2>/dev/null | \
-                   grep -v "github-actions\[bot\]" | \
-                   grep -v "dependabot\[bot\]" | \
-                   grep -v "renovate\[bot\]" | \
-                   head -1)
+        # File must be new in this PR - look at who made the most recent commits in this branch
+        # Get the author who added this file in the current uncommitted/staged changes
+        info=$(git log --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' -n 1 2>/dev/null | \
+               grep -v "github-actions\[bot\]" | \
+               grep -v "dependabot\[bot\]" | \
+               grep -v "renovate\[bot\]")
+
+        # If still empty, the file is completely new and uncommitted
+        if [ -z "$info" ]; then
+            echo "Warning: Cannot determine author for new file $file - no git history available" >&2
+            return 1
         fi
     fi
 
