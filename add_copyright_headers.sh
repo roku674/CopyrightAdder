@@ -162,49 +162,44 @@ should_process_file() {
 get_git_author_info() {
     local file="$1"
     local info=""
-    local source_branch="${SOURCE_BRANCH:-}"
-    
-    # If we have a source branch (from GitHub Actions), use that for history
-    if [ -n "$source_branch" ]; then
-        # Get the first commit that created this file from the source branch
-        info=$(git log "$source_branch" --diff-filter=A --follow --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
+    local source_branch="${SOURCE_BRANCH:-HEAD}"
+
+    # First, ensure we have full git history
+    git fetch --unshallow 2>/dev/null || true
+
+    # Get the first commit that created this file (use --reverse to get oldest first)
+    # Use --follow to track renames, and filter out bot commits
+    info=$(git log --diff-filter=A --follow --reverse --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
+           grep -v "github-actions\[bot\]" | \
+           grep -v "dependabot\[bot\]" | \
+           grep -v "renovate\[bot\]" | \
+           head -1)
+
+    # If no creator found, check if file exists in base branch history
+    if [ -z "$info" ] && [ "$source_branch" != "HEAD" ]; then
+        # Try checking the full history from origin
+        info=$(git log origin/"$source_branch" --diff-filter=A --follow --reverse --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
                grep -v "github-actions\[bot\]" | \
                grep -v "dependabot\[bot\]" | \
-               tail -1)
-    else
-        # Normal operation - get from current branch
-        info=$(git log --diff-filter=A --follow --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
-               grep -v "github-actions\[bot\]" | \
-               grep -v "dependabot\[bot\]" | \
-               tail -1)
+               grep -v "renovate\[bot\]" | \
+               head -1)
     fi
-    
+
     if [ -z "$info" ]; then
-        # If file not in git history yet, try to get current git user
-        local current_author=$(git config user.name 2>/dev/null || echo "Unknown")
-        local current_email=$(git config user.email 2>/dev/null || echo "unknown@unknown.com")
-        
-        # Skip if current user is a bot
-        if [[ "$current_author" == *"[bot]"* ]]; then
-            # Try to get from environment or previous commits
-            if [ -n "$source_branch" ]; then
-                info=$(git log "$source_branch" --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' 2>/dev/null | \
-                       grep -v "github-actions\[bot\]" | \
-                       grep -v "dependabot\[bot\]" | \
-                       head -1)
-            else
-                info=$(git log --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' 2>/dev/null | \
-                       grep -v "github-actions\[bot\]" | \
-                       grep -v "dependabot\[bot\]" | \
-                       head -1)
-            fi
-        else
-            local current_year=$(date +%Y)
-            local current_timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-            info="$current_author|$current_email|$current_year|$current_timestamp"
+        # File must be new in this PR - look at who made the most recent commits in this branch
+        # Get the author who added this file in the current uncommitted/staged changes
+        info=$(git log --format='%an|%ae|%ad' --date=format:'%Y|%Y-%m-%d %H:%M:%S' -n 1 2>/dev/null | \
+               grep -v "github-actions\[bot\]" | \
+               grep -v "dependabot\[bot\]" | \
+               grep -v "renovate\[bot\]")
+
+        # If still empty, the file is completely new and uncommitted
+        if [ -z "$info" ]; then
+            echo "Warning: Cannot determine author for new file $file - no git history available" >&2
+            return 1
         fi
     fi
-    
+
     echo "$info"
 }
 
@@ -289,25 +284,24 @@ add_copyright_header() {
     # Format the author
     formatted_author=$(format_author "$author_name" "$author_email")
     
-    # Get last editor info from git, excluding bot commits
-    local source_branch="${SOURCE_BRANCH:-}"
-    if [ -n "$source_branch" ]; then
-        # Get editor info from source branch
-        editor_info=$(git log "$source_branch" --format='%an|%ae|%ad' --date=format:'%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
-                      grep -v "github-actions\[bot\]" | \
-                      grep -v "dependabot\[bot\]" | \
-                      head -1)
-    else
-        # Normal operation
-        editor_info=$(git log --format='%an|%ae|%ad' --date=format:'%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
-                      grep -v "github-actions\[bot\]" | \
-                      grep -v "dependabot\[bot\]" | \
-                      head -1)
-    fi
-    if [ -n "$editor_info" ]; then
-        IFS='|' read -r editor_name editor_email editor_date <<< "$editor_info"
-        formatted_editor=$(format_author "$editor_name" "$editor_email")
-    fi
+    # Get ALL unique editors from git history (consolidate multiple edits by same person)
+    declare -A editors_map  # Associative array to track unique editors
+    local source_branch="${SOURCE_BRANCH:-HEAD}"
+
+    # Get all commits for this file, extract unique editors with their latest edit date
+    while IFS='|' read -r name email date_time; do
+        # Skip bots and the original author
+        if [[ "$email" == *"[bot]"* ]] || [ "$email" == "$author_email" ]; then
+            continue
+        fi
+        # Store only the latest edit date for each unique editor
+        if [ -z "${editors_map[$email]}" ] || [[ "$date_time" > "${editors_map[$email]##*|}" ]]; then
+            editors_map["$email"]="$name|$date_time"
+        fi
+    done < <(git log --format='%an|%ae|%ad' --date=format:'%Y-%m-%d %H:%M:%S' -- "$file" 2>/dev/null | \
+             grep -v "github-actions\[bot\]" | \
+             grep -v "dependabot\[bot\]" | \
+             grep -v "renovate\[bot\]")
     
     # Build the copyright header with creation timestamp from git
     if [ -n "$RIGHTS_STATEMENT" ]; then
@@ -316,19 +310,24 @@ add_copyright_header() {
         local copyright_text="Copyright © $COMPANY_NAME, $year. All Rights Reserved. Created by $formatted_author on $creation_timestamp"
     fi
     
-    # Add edited by info if editor is different from author
-    local edited_text=""
-    if [ -n "$editor_email" ] && [ "$editor_email" != "$author_email" ]; then
-        edited_text="Edited by $formatted_editor $editor_date"
-    fi
+    # Build edited by lines for all unique editors
+    local edited_lines=()
+    for editor_email in "${!editors_map[@]}"; do
+        IFS='|' read -r editor_name editor_date <<< "${editors_map[$editor_email]}"
+        local formatted_editor=$(format_author "$editor_name" "$editor_email")
+        edited_lines+=("Edited by $formatted_editor $editor_date")
+    done
+
+    # Sort edited lines by date (newest first)
+    IFS=$'\n' edited_lines=($(printf '%s\n' "${edited_lines[@]}" | sort -t' ' -k5 -r))
     
     # Non-JSON files - use comment-based headers
     if [ -n "$comment_style" ]; then
-        local header="${comment_style} $copyright_text${comment_end}"
-        local header2=""
-        if [ -n "$edited_text" ]; then
-            header2="${comment_style} $edited_text${comment_end}"
-        fi
+        local headers=()
+        headers+=("${comment_style} $copyright_text${comment_end}")
+        for edited_line in "${edited_lines[@]}"; do
+            headers+=("${comment_style} $edited_line${comment_end}")
+        done
         
         # Check if file already has a copyright header in the first 10 lines
         if head -n 10 "$file" | grep -q "Copyright.*©.*$COMPANY_NAME\|Copyright.*$COMPANY_NAME"; then
@@ -352,27 +351,24 @@ add_copyright_header() {
                 {print}
             ' "$file" > "$temp_file"
             
-            # Add new headers and rest of file
-            echo "$header" > "$file"
-            # Add existing edited by lines from other people
-            if [ -s "$existing_edited_lines" ]; then
-                while IFS= read -r line; do
-                    echo "$line" >> "$file"
-                done < "$existing_edited_lines"
-            fi
-            # Add current editor's edited by line if different from author
-            if [ -n "$header2" ]; then
-                echo "$header2" >> "$file"
-            fi
+            # Add all new headers
+            first=true
+            for header_line in "${headers[@]}"; do
+                if [ "$first" = true ]; then
+                    echo "$header_line" > "$file"
+                    first=false
+                else
+                    echo "$header_line" >> "$file"
+                fi
+            done
             cat "$temp_file" >> "$file"
             rm "$temp_file" "$existing_edited_lines"
         else
             # Add new copyright headers at the beginning
             temp_file=$(mktemp)
-            echo "$header" > "$temp_file"
-            if [ -n "$header2" ]; then
-                echo "$header2" >> "$temp_file"
-            fi
+            for header_line in "${headers[@]}"; do
+                echo "$header_line" >> "$temp_file"
+            done
             cat "$file" >> "$temp_file"
             mv "$temp_file" "$file"
         fi
