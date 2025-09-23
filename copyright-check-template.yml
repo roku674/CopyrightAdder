@@ -45,8 +45,8 @@ jobs:
           else
             echo "Downloading CopyrightAdder"
             mkdir -p CopyrightAdder
-            curl -sSL https://raw.githubusercontent.com/roku674/Copyright/main/CopyrightAdder/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh
-            curl -sSL https://raw.githubusercontent.com/roku674/Copyright/main/CopyrightAdder/sources.txt -o CopyrightAdder/sources.txt
+            curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/master/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh
+            curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/master/sources.txt -o CopyrightAdder/sources.txt
             chmod +x CopyrightAdder/add_copyright_headers.sh
           fi
       
