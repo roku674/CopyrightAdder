@@ -1,46 +1,28 @@
 # Copyright Header Check
 # This workflow ensures all source files have proper copyright headers
 
-name: Copyright Header Check
+name: Monthly Copyright Update
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches: [develop, development, dev, master, main, default]
+  schedule:
+    # Run at 2:00 AM UTC on the 1st of every month
+    - cron: '0 2 1 * *'
+  workflow_dispatch:  # Allow manual trigger for testing
 
 jobs:
-  copyright-check:
+  copyright-update:
     runs-on: ubuntu-latest
-    # Skip if:
-    # 1. PR is from github-actions bot (prevent infinite loops)
-    # 2. This is the Copyright/CopyrightAdder repo itself
-    # 3. PR is from a copyright-headers branch (prevent infinite loops)
-    # 4. PR author is any bot (contains [bot] in username)
-    # 5. PR title contains copyright-related keywords (prevent re-processing)
-    # 6. PR is merging between protected branches (develop/master/main/dev/development/default)
-    if: |
-      github.actor != 'github-actions[bot]' && 
-      github.actor != 'dependabot[bot]' &&
-      github.repository != 'roku674/Copyright' &&
-      github.repository != 'roku674/CopyrightAdder' &&
-      !startsWith(github.head_ref, 'copyright-headers/') &&
-      !contains(github.event.pull_request.user.login, '[bot]') &&
-      !contains(github.event.pull_request.title, 'Copyright Additions') &&
-      !contains(github.event.pull_request.title, 'Copyright Headers') &&
-      !contains(github.event.pull_request.title, 'Copyright Workflow') &&
-      !(contains(fromJSON('["develop", "master", "main", "dev", "development", "default"]'), github.head_ref) && 
-        contains(fromJSON('["develop", "master", "main", "dev", "development", "default"]'), github.base_ref))
     permissions:
       contents: write
       pull-requests: write
       actions: write
     
     steps:
-      - name: Checkout PR branch
+      - name: Checkout master branch
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          ref: ${{ github.head_ref }}
+          fetch-depth: 0  # Need full history for proper git attribution
+          ref: master
           token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Configure Git Identity
@@ -50,32 +32,6 @@ jobs:
           git config --global user.name "github-actions[bot]"
           echo "Git identity configured for workflow operations"
       
-      - name: Self-Update Copyright Workflow
-        run: |
-          echo "Checking for workflow updates..."
-          
-          # Ensure .github/workflows directory exists
-          mkdir -p .github/workflows
-          
-          # Download latest workflow from master
-          curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/refs/heads/master/.github/workflows/copyright-check.yml -o .github/workflows/copyright-check.yml.tmp
-          
-          # Check if download was successful
-          if [ ! -s ".github/workflows/copyright-check.yml.tmp" ]; then
-            echo "Failed to download workflow update - continuing with current version"
-            rm -f .github/workflows/copyright-check.yml.tmp
-          else
-            # Check if workflow file exists and differs
-            if [ ! -f ".github/workflows/copyright-check.yml" ] || ! cmp -s ".github/workflows/copyright-check.yml" ".github/workflows/copyright-check.yml.tmp"; then
-              echo "Updating copyright-check.yml workflow to latest version"
-              mv .github/workflows/copyright-check.yml.tmp .github/workflows/copyright-check.yml
-              git add .github/workflows/copyright-check.yml
-              echo "Workflow updated successfully"
-            else
-              echo "Workflow is already up to date"
-              rm .github/workflows/copyright-check.yml.tmp
-            fi
-          fi
       
       - name: Setup Copyright Adder
         run: |
@@ -94,25 +50,49 @@ jobs:
             chmod +x CopyrightAdder/add_copyright_headers.sh
           fi
       
-      - name: Get changed files
-        id: changed-files
-        uses: tj-actions/changed-files@v46
-        with:
-          files: |
-            **/*.{java,js,ts,jsx,tsx,cpp,cc,c,h,cs,py,go,rs,rb,php,sh,xml,html,sql}
-      
-      - name: Run Copyright Adder on changed files
-        if: steps.changed-files.outputs.any_changed == 'true'
-        env:
-          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
-          SOURCE_BRANCH: ${{ github.head_ref }}
+      - name: Find all source files
+        id: find-files
         run: |
-          echo "Adding copyright headers to changed files..."
-          echo "Using source branch: $SOURCE_BRANCH for git history"
-          
-          # Ensure we have the source branch history
-          git fetch origin "$SOURCE_BRANCH"
-          
+          # Find all source files that need copyright headers
+          find . -type f \( \
+            -name "*.java" -o \
+            -name "*.js" -o \
+            -name "*.ts" -o \
+            -name "*.jsx" -o \
+            -name "*.tsx" -o \
+            -name "*.cpp" -o \
+            -name "*.cc" -o \
+            -name "*.c" -o \
+            -name "*.h" -o \
+            -name "*.cs" -o \
+            -name "*.py" -o \
+            -name "*.go" -o \
+            -name "*.rs" -o \
+            -name "*.rb" -o \
+            -name "*.php" -o \
+            -name "*.sh" -o \
+            -name "*.xml" -o \
+            -name "*.html" -o \
+            -name "*.sql" \
+          \) ! -path "*/node_modules/*" \
+             ! -path "*/vendor/*" \
+             ! -path "*/build/*" \
+             ! -path "*/dist/*" \
+             ! -path "*/.git/*" \
+             ! -name "*.min.js" \
+             ! -name "*.min.css" > /tmp/files_to_process.txt
+
+          echo "Found $(wc -l < /tmp/files_to_process.txt) files to check"
+          echo "files_count=$(wc -l < /tmp/files_to_process.txt)" >> $GITHUB_OUTPUT
+
+      - name: Run Copyright Adder on all files
+        if: steps.find-files.outputs.files_count != '0'
+        run: |
+          echo "Adding copyright headers to all source files..."
+
+          # Ensure we have full history
+          git fetch --unshallow 2>/dev/null || true
+
           # Determine script path based on submodule structure
           if [ -d "CopyrightAdder" ]; then
             SCRIPT_PATH="./CopyrightAdder/add_copyright_headers.sh"
@@ -122,13 +102,44 @@ jobs:
             echo "Error: Could not find CopyrightAdder script"
             exit 1
           fi
-          
-          for file in $CHANGED_FILES; do
+
+          # Process all files
+          FILES_PROCESSED=0
+          FILES_UPDATED=0
+
+          while IFS= read -r file; do
             if [ -f "$file" ]; then
               echo "Processing: $file"
-              SOURCE_BRANCH="$SOURCE_BRANCH" $SCRIPT_PATH "$file"
+
+              # Create a backup to check if file was actually modified
+              cp "$file" "${file}.bak"
+
+              # Run the copyright script
+              if SOURCE_BRANCH="master" $SCRIPT_PATH "$file"; then
+                FILES_PROCESSED=$((FILES_PROCESSED + 1))
+
+                # Check if file was actually modified
+                if ! cmp -s "$file" "${file}.bak"; then
+                  FILES_UPDATED=$((FILES_UPDATED + 1))
+                  echo "  ✓ Copyright header added/updated"
+                else
+                  echo "  - Already has correct copyright header"
+                fi
+              else
+                echo "  ✗ Error processing file"
+              fi
+
+              # Clean up backup
+              rm -f "${file}.bak"
             fi
-          done
+          done < /tmp/files_to_process.txt
+
+          echo ""
+          echo "Summary:"
+          echo "  Files processed: $FILES_PROCESSED"
+          echo "  Files updated: $FILES_UPDATED"
+
+          echo "files_updated=$FILES_UPDATED" >> $GITHUB_ENV
       
       - name: Check for changes
         id: check-changes
@@ -136,216 +147,126 @@ jobs:
           if [[ -n $(git status --porcelain) ]]; then
             echo "changes=true" >> $GITHUB_OUTPUT
             echo "Files missing copyright headers were found and updated."
-            
-            # List changed files for the PR description
+
+            # Count and list changed files for the PR description
+            echo "changed_count=$(git status --porcelain | wc -l)" >> $GITHUB_OUTPUT
+
+            # Store changed files list for PR description (limit to prevent too long output)
             echo "changed_files<<EOF" >> $GITHUB_OUTPUT
-            git status --porcelain | grep -E "^\s*M" | cut -c 4-
+            git status --porcelain | grep -E "^\s*M" | cut -c 4- | head -50
+            if [ $(git status --porcelain | grep -E "^\s*M" | wc -l) -gt 50 ]; then
+              echo "... and $(($(git status --porcelain | grep -E "^\s*M" | wc -l) - 50)) more files"
+            fi
             echo "EOF" >> $GITHUB_OUTPUT
           else
             echo "changes=false" >> $GITHUB_OUTPUT
             echo "All files have proper copyright headers."
           fi
       
-      - name: Check for workflow updates
-        id: check-workflow-updates
-        run: |
-          # Check if there are any workflow updates to commit
-          if [[ -n $(git status --porcelain .github/workflows/copyright-check.yml 2>/dev/null) ]]; then
-            echo "workflow_changes=true" >> $GITHUB_OUTPUT
-            echo "Workflow updates detected"
-          else
-            echo "workflow_changes=false" >> $GITHUB_OUTPUT
-            echo "No workflow updates needed"
-          fi
-      
       - name: Create new branch for copyright headers
-        if: steps.check-changes.outputs.changes == 'true' || steps.check-workflow-updates.outputs.workflow_changes == 'true'
+        if: steps.check-changes.outputs.changes == 'true'
         id: create-branch
-        env:
-          PR_AUTHOR_EMAIL: ${{ github.event.pull_request.user.email || 'noreply@github.com' }}
-          PR_AUTHOR_NAME: ${{ github.event.pull_request.user.login }}
-          PR_AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}
         run: |
-          # Generate unique branch name
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
-          NEW_BRANCH="copyright-headers/${{ github.head_ref }}-${TIMESTAMP}"
-          echo "branch_name=${NEW_BRANCH}" >> $GITHUB_OUTPUT
-          
-          # Create and checkout new branch
-          git checkout -b "${NEW_BRANCH}"
-          
-          # Configure git with bot identity (required for push permissions)
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add -A
-          
-          # Create appropriate commit message based on what changed
-          if [[ "${{ steps.check-changes.outputs.changes }}" == "true" && "${{ steps.check-workflow-updates.outputs.workflow_changes }}" == "true" ]]; then
-            COMMIT_MSG="Add copyright headers and update workflow"
-          elif [[ "${{ steps.check-changes.outputs.changes }}" == "true" ]]; then
-            COMMIT_MSG="Add copyright headers to source files"
-          else
-            COMMIT_MSG="Update copyright workflow"
-          fi
-          
-          # Add co-author attribution to the original PR author
-          COMMIT_MSG="${COMMIT_MSG}
+          # Generate branch name with current date
+          MONTH=$(date +%B)
+          YEAR=$(date +%Y)
+          BRANCH_NAME="copyright-headers/monthly-update-$(date +%Y-%m)"
+          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+          echo "month=${MONTH}" >> $GITHUB_OUTPUT
+          echo "year=${YEAR}" >> $GITHUB_OUTPUT
 
-Co-authored-by: ${PR_AUTHOR_NAME} <${PR_AUTHOR_LOGIN}@users.noreply.github.com>"
-          
-          # Create the commit
-          git commit -m "${COMMIT_MSG}"
-          
+          # Create and checkout new branch
+          git checkout -b "${BRANCH_NAME}"
+
+          # Add all changes
+          git add -A
+
+          # Create commit
+          git commit -m "Add copyright headers - ${MONTH} ${YEAR} monthly update"
+
           # Push the new branch
-          git push origin "${NEW_BRANCH}"
+          git push origin "${BRANCH_NAME}"
       
+      - name: Close existing copyright PRs
+        if: steps.check-changes.outputs.changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Find and close any existing monthly copyright PRs
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              base: 'master'
+            });
+
+            const copyrightPRs = prs.filter(pr =>
+              pr.head.ref.startsWith('copyright-headers/monthly-update-') &&
+              pr.user.login === 'github-actions[bot]'
+            );
+
+            for (const pr of copyrightPRs) {
+              console.log(`Closing old monthly copyright PR #${pr.number}`);
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: '🔄 **Superseded by new monthly copyright update**\n\nThis PR is being closed because a new monthly copyright update has been generated.'
+              });
+
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                state: 'closed'
+              });
+            }
+
       - name: Create Pull Request
-        if: steps.check-changes.outputs.changes == 'true' || steps.check-workflow-updates.outputs.workflow_changes == 'true'
+        if: steps.check-changes.outputs.changes == 'true'
         uses: actions/github-script@v7
         with:
           script: |
             const branchName = '${{ steps.create-branch.outputs.branch_name }}';
-            const baseBranch = '${{ github.base_ref }}';
+            const month = '${{ steps.create-branch.outputs.month }}';
+            const year = '${{ steps.create-branch.outputs.year }}';
             const changedFiles = `${{ steps.check-changes.outputs.changed_files }}`;
-            const hasCodeChanges = '${{ steps.check-changes.outputs.changes }}' === 'true';
-            const hasWorkflowChanges = '${{ steps.check-workflow-updates.outputs.workflow_changes }}' === 'true';
-            
-            // First, clean up ALL old copyright-headers branches (not just open PRs)
-            console.log('Cleaning up old copyright-headers branches...');
-            const { data: branches } = await github.rest.repos.listBranches({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 100
-            });
-            
-            const copyrightBranches = branches.filter(branch => 
-              branch.name.startsWith('copyright-headers/') && 
-              branch.name !== branchName
-            );
-            
-            console.log(`Found ${copyrightBranches.length} old copyright-headers branches to clean up`);
-            
-            for (const branch of copyrightBranches) {
-              try {
-                await github.rest.git.deleteRef({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ref: `heads/${branch.name}`
-                });
-                console.log(`Deleted old branch: ${branch.name}`);
-              } catch (error) {
-                console.log(`Could not delete branch ${branch.name}: ${error.message}`);
-              }
-            }
-            
-            // Now check for existing open PRs from copyright-headers/* branches to the same base branch
-            const existingPRs = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              base: baseBranch
-            });
-            
-            // Look for existing copyright PRs targeting the same branch
-            const existingCopyrightPRs = existingPRs.data.filter(pr => 
-              pr.head.ref.startsWith('copyright-headers/') && 
-              pr.base.ref === baseBranch &&
-              pr.labels.some(label => label.name === 'copyright')
-            );
-            
-            if (existingCopyrightPRs.length > 0) {
-              console.log(`Found ${existingCopyrightPRs.length} existing copyright PR(s) for branch ${baseBranch}`);
-              
-              // Close all existing copyright PRs for this branch
-              for (const pr of existingCopyrightPRs) {
-                console.log(`Closing existing PR #${pr.number} (${pr.head.ref})`);
-                
-                // Add closing comment
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: pr.number,
-                  body: `🔄 **Superseded by new copyright check**\n\nThis PR is being closed because a new copyright check has been triggered. A fresh PR will be created with the latest changes.`
-                });
-                
-                // Close the PR
-                await github.rest.pulls.update({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: pr.number,
-                  state: 'closed'
-                });
-              }
-            }
-            
-            let prTitle = '';
-            let prBody = '';
-            
-            // Get original PR author information
-            const originalPR = context.payload.pull_request;
-            const authorName = originalPR.user.login;
-            const authorUrl = originalPR.user.html_url;
-            
-            if (hasCodeChanges && hasWorkflowChanges) {
-              prTitle = `Alexander's Anointed Copyright Additions for ${baseBranch}`;
-              prBody = `## Copyright Headers Added + Workflow Updated
-              
-              This automated pull request adds missing copyright headers to source files and updates the copyright workflow in the \`${baseBranch}\` branch.
-              
-              ### Changed Files:
-              \`\`\`
-              ${changedFiles}
-              \`\`\`
-              
-              ### Updates:
-              - Added missing copyright headers to source files
-              - Updated .github/workflows/copyright-check.yml to latest version
-              
-              ### Notes:
-              - This PR was automatically generated by the Copyright Header Check workflow
-              - Triggered by PR from [@${authorName}](${authorUrl})
-              - Please review the changes before merging
-              - This PR targets the base branch \`${baseBranch}\` where your changes will be merged
-              
-              ---
-              *Generated by GitHub Actions on behalf of [@${authorName}](${authorUrl})*`;
-            } else if (hasCodeChanges) {
-              prTitle = `Alexander's Anointed Copyright Additions for ${baseBranch}`;
-              prBody = `## Copyright Headers Added
-              
-              This automated pull request adds missing copyright headers to source files in the \`${baseBranch}\` branch.
-              
-              ### Changed Files:
-              \`\`\`
-              ${changedFiles}
-              \`\`\`
-              
-              ### Notes:
-              - This PR was automatically generated by the Copyright Header Check workflow
-              - Triggered by PR from [@${authorName}](${authorUrl})
-              - Please review the changes before merging
-              - This PR targets the base branch \`${baseBranch}\` where your changes will be merged
-              
-              ---
-              *Generated by GitHub Actions on behalf of [@${authorName}](${authorUrl})*`;
-            } else {
-              prTitle = `Alexander's Anointed Copyright Workflow Update for ${baseBranch}`;
-              prBody = `## Copyright Workflow Updated
-              
-              This automated pull request updates the copyright workflow in the \`${baseBranch}\` branch.
-              
-              ### Updates:
-              - Updated .github/workflows/copyright-check.yml to latest version
-              
-              ### Notes:
-              - This PR was automatically generated by the Copyright Header Check workflow
-              - Triggered by PR from [@${authorName}](${authorUrl})
-              - Please review the changes before merging
-              - This PR targets the base branch \`${baseBranch}\` where your changes will be merged
-              
-              ---
-              *Generated by GitHub Actions on behalf of [@${authorName}](${authorUrl})*`;
-            }
+            const changedCount = '${{ steps.check-changes.outputs.changed_count }}';
+
+            const prTitle = `Monthly Copyright Headers Update - ${month} ${year}`;
+
+            const prBody = `## 📅 Monthly Copyright Headers Update
+
+            This automated pull request adds missing copyright headers to source files as part of the scheduled monthly maintenance.
+
+            ### 📊 Statistics
+            - **Files Updated**: ${changedCount}
+            - **Date**: ${month} ${year}
+            - **Target Branch**: master
+
+            ### 📝 Changed Files
+            <details>
+            <summary>Click to expand file list</summary>
+
+            \`\`\`
+            ${changedFiles}
+            \`\`\`
+            </details>
+
+            ### ℹ️ About This PR
+            - This PR is automatically generated on the 1st of each month
+            - It ensures all source files have proper copyright headers
+            - Review the changes to ensure they look correct
+            - Once merged, all files will have up-to-date copyright information
+
+            ### ✅ Next Steps
+            1. Review the changes
+            2. Ensure tests pass
+            3. Merge when ready
+
+            ---
+            *🤖 Generated automatically by the Monthly Copyright Update workflow*`;
             
             const pr = await github.rest.pulls.create({
               owner: context.repo.owner,
@@ -353,21 +274,18 @@ Co-authored-by: ${PR_AUTHOR_NAME} <${PR_AUTHOR_LOGIN}@users.noreply.github.com>"
               title: prTitle,
               body: prBody,
               head: branchName,
-              base: baseBranch,
-              labels: ['copyright', 'automated', 'github-actions', 'documentation']
+              base: 'master',
+              labels: ['copyright', 'automated', 'monthly-update', 'maintenance']
             });
-            
+
             console.log(`Created PR #${pr.data.number}: ${pr.data.html_url}`);
-            
-            // Add comment to original PR
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: `⚠️ **Missing Copyright Headers Detected**\n\nI've created PR #${pr.data.number} to add missing copyright headers to your branch. Please review and merge it into your branch before this PR can be merged.`
-            });
+
+            // Output PR URL for notification purposes
+            core.setOutput('pr_url', pr.data.html_url);
+            core.setOutput('pr_number', pr.data.number);
       
       - name: Clean up
         if: always()
         run: |
           rm -rf CopyrightAdder
+          rm -f /tmp/files_to_process.txt
