@@ -18,11 +18,21 @@ jobs:
       actions: write
     
     steps:
-      - name: Checkout master branch
+      - name: Determine default branch
+        id: default-branch
+        run: |
+          # Get the default branch from GitHub API
+          DEFAULT_BRANCH=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}" | \
+            jq -r '.default_branch')
+          echo "branch=${DEFAULT_BRANCH}" >> $GITHUB_OUTPUT
+          echo "Default branch detected: ${DEFAULT_BRANCH}"
+
+      - name: Checkout default branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Need full history for proper git attribution
-          ref: master
+          ref: ${{ steps.default-branch.outputs.branch }}
           token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Configure Git Identity
@@ -35,20 +45,36 @@ jobs:
       
       - name: Setup Copyright Adder
         run: |
-          # Check if CopyrightAdder exists as submodule, otherwise download
-          if [ -d "CopyrightAdder" ]; then
-            echo "Using existing CopyrightAdder submodule"
-            chmod +x CopyrightAdder/add_copyright_headers.sh
-          elif [ -d "Copyright/CopyrightAdder" ]; then
-            echo "Using existing Copyright/CopyrightAdder submodule"
-            chmod +x Copyright/CopyrightAdder/add_copyright_headers.sh
-          else
-            echo "Downloading CopyrightAdder"
-            mkdir -p CopyrightAdder
-            curl -sSL https://raw.githubusercontent.com/roku674/Copyright/main/CopyrightAdder/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh
-            curl -sSL https://raw.githubusercontent.com/roku674/Copyright/main/CopyrightAdder/sources.txt -o CopyrightAdder/sources.txt
-            chmod +x CopyrightAdder/add_copyright_headers.sh
+          # Always download latest script, but preserve existing sources.txt
+          echo "Downloading latest copyright script..."
+
+          # Check if sources.txt already exists in either location
+          SOURCES_EXISTS=false
+          if [ -f "CopyrightAdder/sources.txt" ]; then
+            SOURCES_EXISTS=true
+            SOURCES_LOCATION="CopyrightAdder/sources.txt"
+          elif [ -f "Copyright/CopyrightAdder/sources.txt" ]; then
+            SOURCES_EXISTS=true
+            SOURCES_LOCATION="Copyright/CopyrightAdder/sources.txt"
           fi
+
+          # Download to CopyrightAdder directory
+          mkdir -p CopyrightAdder
+          curl -sSL https://raw.githubusercontent.com/roku674/Copyright/main/CopyrightAdder/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh
+
+          # Only download sources.txt if it doesn't already exist
+          if [ "$SOURCES_EXISTS" = true ]; then
+            echo "Preserving existing sources.txt at: $SOURCES_LOCATION"
+            # If sources.txt is in Copyright/CopyrightAdder, copy it to CopyrightAdder
+            if [ "$SOURCES_LOCATION" = "Copyright/CopyrightAdder/sources.txt" ]; then
+              cp "$SOURCES_LOCATION" CopyrightAdder/sources.txt
+            fi
+          else
+            echo "Downloading default sources.txt..."
+            curl -sSL https://raw.githubusercontent.com/roku674/Copyright/main/CopyrightAdder/sources.txt -o CopyrightAdder/sources.txt
+          fi
+
+          chmod +x CopyrightAdder/add_copyright_headers.sh
       
       - name: Find all source files
         id: find-files
@@ -115,7 +141,7 @@ jobs:
               cp "$file" "${file}.bak"
 
               # Run the copyright script
-              if SOURCE_BRANCH="master" $SCRIPT_PATH "$file"; then
+              if SOURCE_BRANCH="${{ steps.default-branch.outputs.branch }}" $SCRIPT_PATH "$file"; then
                 FILES_PROCESSED=$((FILES_PROCESSED + 1))
 
                 # Check if file was actually modified
@@ -197,7 +223,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              base: 'master'
+              base: '${{ steps.default-branch.outputs.branch }}'
             });
 
             const copyrightPRs = prs.filter(pr =>
@@ -243,7 +269,7 @@ jobs:
             ### 📊 Statistics
             - **Files Updated**: ${changedCount}
             - **Date**: ${month} ${year}
-            - **Target Branch**: master
+            - **Target Branch**: ${{ steps.default-branch.outputs.branch }}
 
             ### 📝 Changed Files
             <details>
@@ -274,7 +300,7 @@ jobs:
               title: prTitle,
               body: prBody,
               head: branchName,
-              base: 'master',
+              base: '${{ steps.default-branch.outputs.branch }}',
               labels: ['copyright', 'automated', 'monthly-update', 'maintenance']
             });
 
