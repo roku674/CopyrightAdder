@@ -18,11 +18,21 @@ jobs:
       actions: write
     
     steps:
-      - name: Checkout master branch
+      - name: Determine default branch
+        id: default-branch
+        run: |
+          # Get the default branch from GitHub API
+          DEFAULT_BRANCH=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}" | \
+            jq -r '.default_branch')
+          echo "branch=${DEFAULT_BRANCH}" >> $GITHUB_OUTPUT
+          echo "Default branch detected: ${DEFAULT_BRANCH}"
+
+      - name: Checkout default branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Need full history for proper git attribution
-          ref: master
+          ref: ${{ steps.default-branch.outputs.branch }}
           token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Configure Git Identity
@@ -115,7 +125,7 @@ jobs:
               cp "$file" "${file}.bak"
 
               # Run the copyright script
-              if SOURCE_BRANCH="master" $SCRIPT_PATH "$file"; then
+              if SOURCE_BRANCH="${{ steps.default-branch.outputs.branch }}" $SCRIPT_PATH "$file"; then
                 FILES_PROCESSED=$((FILES_PROCESSED + 1))
 
                 # Check if file was actually modified
@@ -197,7 +207,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              base: 'master'
+              base: '${{ steps.default-branch.outputs.branch }}'
             });
 
             const copyrightPRs = prs.filter(pr =>
@@ -243,7 +253,7 @@ jobs:
             ### 📊 Statistics
             - **Files Updated**: ${changedCount}
             - **Date**: ${month} ${year}
-            - **Target Branch**: master
+            - **Target Branch**: ${{ steps.default-branch.outputs.branch }}
 
             ### 📝 Changed Files
             <details>
@@ -274,7 +284,7 @@ jobs:
               title: prTitle,
               body: prBody,
               head: branchName,
-              base: 'master',
+              base: '${{ steps.default-branch.outputs.branch }}',
               labels: ['copyright', 'automated', 'monthly-update', 'maintenance']
             });
 
