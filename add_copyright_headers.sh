@@ -8,17 +8,41 @@
 # Function to read configuration from sources.txt
 read_config() {
     local config_file="sources.txt"
-    
+
     # Check if sources.txt exists in current directory
     if [ ! -f "$config_file" ]; then
         # Check if it exists in script directory
         local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
         config_file="$script_dir/sources.txt"
-        
+
         if [ ! -f "$config_file" ]; then
-            echo "Error: sources.txt not found!"
-            echo "Please create a sources.txt file with configuration."
-            exit 1
+            # Search for sources.txt in the git repository
+            echo "Searching for sources.txt in git repository..."
+            local git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+
+            if [ -n "$git_root" ]; then
+                # Find sources.txt in the repo, excluding common directories
+                local found_file=$(find "$git_root" -name "sources.txt" \
+                    ! -path "*/node_modules/*" \
+                    ! -path "*/.git/*" \
+                    ! -path "*/dist/*" \
+                    ! -path "*/build/*" \
+                    ! -path "*/vendor/*" \
+                    -type f -print -quit 2>/dev/null)
+
+                if [ -n "$found_file" ]; then
+                    config_file="$found_file"
+                    echo "Found sources.txt at: $config_file"
+                else
+                    echo "Error: sources.txt not found in repository!"
+                    echo "Please create a sources.txt file with configuration."
+                    exit 1
+                fi
+            else
+                echo "Error: Not in a git repository and sources.txt not found!"
+                echo "Please create a sources.txt file with configuration."
+                exit 1
+            fi
         fi
     fi
     
