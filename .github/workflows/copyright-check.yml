@@ -48,7 +48,7 @@ jobs:
           echo "Checking for workflow updates..."
 
           WORKFLOW_PATH=".github/workflows/copyright-check.yml"
-          LATEST_WORKFLOW_URL="https://raw.githubusercontent.com/roku674/Copyright/main/CopyrightAdder/.github/workflows/copyright-check.yml"
+          LATEST_WORKFLOW_URL="https://raw.githubusercontent.com/roku674/CopyrightAdder/master/.github/workflows/copyright-check.yml"
 
           # Download latest workflow to temp location
           curl -sSL "$LATEST_WORKFLOW_URL" -o /tmp/copyright-check-latest.yml
