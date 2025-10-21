@@ -45,20 +45,13 @@ jobs:
       
       - name: Setup Copyright Adder
         run: |
-          # Check if CopyrightAdder exists as submodule, otherwise download
-          if [ -d "CopyrightAdder" ]; then
-            echo "Using existing CopyrightAdder submodule"
-            chmod +x CopyrightAdder/add_copyright_headers.sh
-          elif [ -d "Copyright/CopyrightAdder" ]; then
-            echo "Using existing Copyright/CopyrightAdder submodule"
-            chmod +x Copyright/CopyrightAdder/add_copyright_headers.sh
-          else
-            echo "Downloading CopyrightAdder"
-            mkdir -p CopyrightAdder
-            curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/master/add_copyright_headers.sh -o CopyrightAdder/add_copyright_headers.sh
-            curl -sSL https://raw.githubusercontent.com/roku674/CopyrightAdder/master/sources.txt -o CopyrightAdder/sources.txt
-            chmod +x CopyrightAdder/add_copyright_headers.sh
-          fi
+          # Download latest script to temp location
+          echo "Downloading latest copyright script..."
+          curl -sSL https://raw.githubusercontent.com/roku674/Copyright/main/CopyrightAdder/add_copyright_headers.sh -o /tmp/add_copyright_headers.sh
+          chmod +x /tmp/add_copyright_headers.sh
+
+          # Script will automatically search for sources.txt in the repository
+          echo "Script will search for sources.txt in repository..."
       
       - name: Find all source files
         id: find-files
@@ -103,15 +96,8 @@ jobs:
           # Ensure we have full history
           git fetch --unshallow 2>/dev/null || true
 
-          # Determine script path based on submodule structure
-          if [ -d "CopyrightAdder" ]; then
-            SCRIPT_PATH="./CopyrightAdder/add_copyright_headers.sh"
-          elif [ -d "Copyright/CopyrightAdder" ]; then
-            SCRIPT_PATH="./Copyright/CopyrightAdder/add_copyright_headers.sh"
-          else
-            echo "Error: Could not find CopyrightAdder script"
-            exit 1
-          fi
+          # Use the script downloaded to temp location
+          SCRIPT_PATH="/tmp/add_copyright_headers.sh"
 
           # Process all files
           FILES_PROCESSED=0
@@ -297,5 +283,5 @@ jobs:
       - name: Clean up
         if: always()
         run: |
-          rm -rf CopyrightAdder
+          rm -f /tmp/add_copyright_headers.sh
           rm -f /tmp/files_to_process.txt
