@@ -29,7 +29,7 @@ jobs:
           echo "Default branch detected: ${DEFAULT_BRANCH}"
 
       - name: Checkout default branch
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Need full history for proper git attribution
           ref: ${{ steps.default-branch.outputs.branch }}
@@ -41,36 +41,8 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           echo "Git identity configured for workflow operations"
-
-      - name: Update workflow to latest version
-        run: |
-          # Download latest workflow from CopyrightAdder repo
-          echo "Checking for workflow updates..."
-
-          WORKFLOW_PATH=".github/workflows/copyright-check.yml"
-          LATEST_WORKFLOW_URL="https://raw.githubusercontent.com/roku674/CopyrightAdder/master/.github/workflows/copyright-check.yml"
-
-          # Download latest workflow to temp location
-          curl -sSL "$LATEST_WORKFLOW_URL" -o /tmp/copyright-check-latest.yml
-
-          # Check if workflow has changed
-          if ! cmp -s "$WORKFLOW_PATH" /tmp/copyright-check-latest.yml; then
-            echo "Workflow update available, applying update..."
-            cp /tmp/copyright-check-latest.yml "$WORKFLOW_PATH"
-            git add "$WORKFLOW_PATH"
-
-            # Only commit if there are changes (in case git add didn't stage anything)
-            if ! git diff --cached --quiet; then
-              git commit -m "Update copyright workflow to latest version"
-              echo "Workflow updated and committed"
-            fi
-          else
-            echo "Workflow is already up to date"
-          fi
-
-          # Clean up
-          rm -f /tmp/copyright-check-latest.yml
-
+      
+      
       - name: Setup Copyright Adder
         run: |
           # Always download latest script, but preserve existing sources.txt
@@ -207,9 +179,9 @@ jobs:
 
             # Store changed files list for PR description (limit to prevent too long output)
             echo "changed_files<<EOF" >> $GITHUB_OUTPUT
-            git status --porcelain | grep -E "^\\s*M" | cut -c 4- | head -50
-            if [ $(git status --porcelain | grep -E "^\\s*M" | wc -l) -gt 50 ]; then
-              echo "... and $(($(git status --porcelain | grep -E "^\\s*M" | wc -l) - 50)) more files"
+            git status --porcelain | grep -E "^\s*M" | cut -c 4- | head -50
+            if [ $(git status --porcelain | grep -E "^\s*M" | wc -l) -gt 50 ]; then
+              echo "... and $(($(git status --porcelain | grep -E "^\s*M" | wc -l) - 50)) more files"
             fi
             echo "EOF" >> $GITHUB_OUTPUT
           else
@@ -243,7 +215,7 @@ jobs:
       
       - name: Close existing copyright PRs
         if: steps.check-changes.outputs.changes == 'true'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v7
         with:
           script: |
             // Find and close any existing monthly copyright PRs
@@ -279,7 +251,7 @@ jobs:
 
       - name: Create Pull Request
         if: steps.check-changes.outputs.changes == 'true'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v7
         with:
           script: |
             const branchName = '${{ steps.create-branch.outputs.branch_name }}';
