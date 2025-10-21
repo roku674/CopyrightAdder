@@ -179,9 +179,9 @@ jobs:
 
             # Store changed files list for PR description (limit to prevent too long output)
             echo "changed_files<<EOF" >> $GITHUB_OUTPUT
-            git status --porcelain | grep -E "^\s*M" | cut -c 4- | head -50
-            if [ $(git status --porcelain | grep -E "^\s*M" | wc -l) -gt 50 ]; then
-              echo "... and $(($(git status --porcelain | grep -E "^\s*M" | wc -l) - 50)) more files"
+            git status --porcelain | grep -E "^\\s*M" | cut -c 4- | head -50
+            if [ $(git status --porcelain | grep -E "^\\s*M" | wc -l) -gt 50 ]; then
+              echo "... and $(($(git status --porcelain | grep -E "^\\s*M" | wc -l) - 50)) more files"
             fi
             echo "EOF" >> $GITHUB_OUTPUT
           else
