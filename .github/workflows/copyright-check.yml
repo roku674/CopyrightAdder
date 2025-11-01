@@ -297,6 +297,7 @@ jobs:
 
       - name: Create Pull Request
         if: steps.check-changes.outputs.changes == 'true'
+        id: create-pr
         uses: actions/github-script@v8
         with:
           script: |
@@ -339,7 +340,7 @@ jobs:
 
             ---
             *🤖 Generated automatically by the Monthly Copyright Update workflow*`;
-            
+
             const pr = await github.rest.pulls.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -355,6 +356,30 @@ jobs:
             // Output PR URL for notification purposes
             core.setOutput('pr_url', pr.data.html_url);
             core.setOutput('pr_number', pr.data.number);
+
+      - name: Request review from repository owner
+        if: steps.check-changes.outputs.changes == 'true'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prNumber = ${{ steps.create-pr.outputs.pr_number }};
+            const repoOwner = context.repo.owner;
+
+            try {
+              // Request review from repository owner
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                reviewers: [repoOwner]
+              });
+
+              console.log(`✓ Successfully requested review from @${repoOwner} on PR #${prNumber}`);
+            } catch (error) {
+              // If review request fails (e.g., owner is the PR author), log but don't fail
+              console.log(`Note: Could not request review from @${repoOwner}: ${error.message}`);
+              console.log('This is expected if the repository owner is the same as the workflow actor.');
+            }
       
       - name: Clean up
         if: always()
