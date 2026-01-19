@@ -198,23 +198,28 @@ jobs:
       - name: Check for changes
         id: check-changes
         run: |
-          if [[ -n $(git status --porcelain) ]]; then
+          # Only check for changes in SOURCE files, not working files (CopyrightAdder/, etc.)
+          # This prevents false positives when only working files are modified
+          SOURCE_CHANGES=$(git diff --name-only | grep -E '\.(java|js|ts|jsx|tsx|cpp|cc|c|h|cs|py|go|rs|rb|php|xml|html|sql)$' | grep -v '^CopyrightAdder/' | grep -v 'sources\.txt$' || true)
+
+          if [[ -n "$SOURCE_CHANGES" ]]; then
             echo "changes=true" >> $GITHUB_OUTPUT
             echo "Files missing copyright headers were found and updated."
 
-            # Count and list changed files for the PR description
-            echo "changed_count=$(git status --porcelain | wc -l)" >> $GITHUB_OUTPUT
+            # Count and list changed source files for the PR description
+            CHANGED_COUNT=$(echo "$SOURCE_CHANGES" | wc -l)
+            echo "changed_count=$CHANGED_COUNT" >> $GITHUB_OUTPUT
 
             # Store changed files list for PR description (limit to prevent too long output)
             echo "changed_files<<EOF" >> $GITHUB_OUTPUT
-            git status --porcelain | grep -E "^\s*M" | cut -c 4- | head -50
-            if [ $(git status --porcelain | grep -E "^\s*M" | wc -l) -gt 50 ]; then
-              echo "... and $(($(git status --porcelain | grep -E "^\s*M" | wc -l) - 50)) more files"
+            echo "$SOURCE_CHANGES" | head -50
+            if [ "$CHANGED_COUNT" -gt 50 ]; then
+              echo "... and $((CHANGED_COUNT - 50)) more files"
             fi
             echo "EOF" >> $GITHUB_OUTPUT
           else
             echo "changes=false" >> $GITHUB_OUTPUT
-            echo "All files have proper copyright headers."
+            echo "All source files have proper copyright headers. No changes needed."
           fi
       
       - name: Create new branch for copyright headers
@@ -249,9 +254,11 @@ jobs:
 
           # Verify something was staged
           if git diff --cached --quiet; then
-            echo "ERROR: No source files were staged for commit"
-            exit 1
+            echo "No source files were staged for commit - all files already have correct headers."
+            echo "skip_pr=true" >> $GITHUB_OUTPUT
+            exit 0
           fi
+          echo "skip_pr=false" >> $GITHUB_OUTPUT
 
           # Create commit
           git commit -m "Add copyright headers - ${MONTH} ${YEAR} monthly update"
@@ -260,7 +267,7 @@ jobs:
           git push origin "${BRANCH_NAME}"
       
       - name: Close existing copyright PRs
-        if: steps.check-changes.outputs.changes == 'true'
+        if: steps.check-changes.outputs.changes == 'true' && steps.create-branch.outputs.skip_pr != 'true'
         uses: actions/github-script@v8
         with:
           script: |
@@ -296,7 +303,7 @@ jobs:
             }
 
       - name: Create Pull Request
-        if: steps.check-changes.outputs.changes == 'true'
+        if: steps.check-changes.outputs.changes == 'true' && steps.create-branch.outputs.skip_pr != 'true'
         id: create-pr
         uses: actions/github-script@v8
         with:
@@ -358,7 +365,7 @@ jobs:
             core.setOutput('pr_number', pr.data.number);
 
       - name: Request review from repository owner
-        if: steps.check-changes.outputs.changes == 'true'
+        if: steps.check-changes.outputs.changes == 'true' && steps.create-branch.outputs.skip_pr != 'true'
         uses: actions/github-script@v8
         with:
           script: |
