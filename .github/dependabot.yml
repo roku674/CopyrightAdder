@@ -19,7 +19,7 @@ updates:
         dependency-type: "production"
       development-dependencies:
         dependency-type: "development"
-        
+
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -29,8 +29,16 @@ updates:
     target-branch: "develop"
     reviewers:
       - "${{github.repository_owner}}"
-    
+
   # Enable version updates for Docker
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+      major:
+        update-types:
+          - major
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
@@ -39,8 +47,16 @@ updates:
     target-branch: "develop"
     reviewers:
       - "${{github.repository_owner}}"
-    
+
   # Enable version updates for pip (Python)
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+      major:
+        update-types:
+          - major
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
@@ -49,8 +65,16 @@ updates:
     target-branch: "develop"
     reviewers:
       - "${{github.repository_owner}}"
-    
+
   # Enable version updates for Maven
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+      major:
+        update-types:
+          - major
   - package-ecosystem: "maven"
     directory: "/"
     schedule:
@@ -59,8 +83,16 @@ updates:
     target-branch: "develop"
     reviewers:
       - "${{github.repository_owner}}"
-    
+
   # Enable version updates for Gradle
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+      major:
+        update-types:
+          - major
   - package-ecosystem: "gradle"
     directory: "/"
     schedule:
@@ -69,8 +101,16 @@ updates:
     target-branch: "develop"
     reviewers:
       - "${{github.repository_owner}}"
-    
+
   # Enable version updates for NuGet
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+      major:
+        update-types:
+          - major
   - package-ecosystem: "nuget"
     directory: "/"
     schedule:
@@ -79,8 +119,16 @@ updates:
     target-branch: "develop"
     reviewers:
       - "${{github.repository_owner}}"
-    
+
   # Enable version updates for Composer (PHP)
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+      major:
+        update-types:
+          - major
   - package-ecosystem: "composer"
     directory: "/"
     schedule:
@@ -89,8 +137,16 @@ updates:
     target-branch: "develop"
     reviewers:
       - "${{github.repository_owner}}"
-    
+
   # Enable version updates for Bundler (Ruby)
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+      major:
+        update-types:
+          - major
   - package-ecosystem: "bundler"
     directory: "/"
     schedule:
@@ -99,8 +155,16 @@ updates:
     target-branch: "develop"
     reviewers:
       - "${{github.repository_owner}}"
-    
+
   # Enable version updates for Go modules
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+      major:
+        update-types:
+          - major
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
@@ -109,8 +173,16 @@ updates:
     target-branch: "develop"
     reviewers:
       - "${{github.repository_owner}}"
-    
+
   # Enable version updates for Cargo (Rust)
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+      major:
+        update-types:
+          - major
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
@@ -119,3 +191,11 @@ updates:
     target-branch: "develop"
     reviewers:
       - "${{github.repository_owner}}"
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+      major:
+        update-types:
+          - major
