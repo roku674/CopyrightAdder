@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM Copyright © Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-02 09:35:27
+REM Copyright © Alexander Fields, 2025. All Rights Reserved. Coded by Alexander Fields https://www.alexanderfields.me on 2025-07-02 09:35:27
 REM Universal Copyright Header Script for Windows
 REM Automatically adds copyright headers with correct attribution based on git history
 REM Works with any git repository
@@ -493,9 +493,9 @@ if not "!editor_info!"=="" (
 
 REM Build the copyright text with creation timestamp from git
 if not "%RIGHTS_STATEMENT%"=="" (
-    set "copyright_text=Copyright %COMPANY_NAME%, !year!. %RIGHTS_STATEMENT% Created by !formatted_author! on !creation_timestamp!"
+    set "copyright_text=Copyright %COMPANY_NAME%, !year!. %RIGHTS_STATEMENT% Coded by !formatted_author! on !creation_timestamp!"
 ) else (
-    set "copyright_text=Copyright %COMPANY_NAME%, !year!. All Rights Reserved. Created by !formatted_author! on !creation_timestamp!"
+    set "copyright_text=Copyright %COMPANY_NAME%, !year!. All Rights Reserved. Coded by !formatted_author! on !creation_timestamp!"
 )
 
 REM Add edited by info if we have editor info and it's different from author

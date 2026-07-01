@@ -1,4 +1,4 @@
-# Copyright © Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-02 09:35:27
+# Copyright © Alexander Fields, 2025. All Rights Reserved. Coded by Alexander Fields https://www.alexanderfields.me on 2025-07-02 09:35:27
 # Universal Copyright Header Script for Windows PowerShell
 # Automatically adds copyright headers with correct attribution based on git history
 # Works with any git repository
@@ -287,9 +287,9 @@ function Add-CopyrightHeader {
     
     # Build the copyright text with creation timestamp from git
     if ($RightsStatement) {
-        $copyrightText = "Copyright © $CompanyName, $year. $RightsStatement Created by $formattedAuthor on $creationTimestamp"
+        $copyrightText = "Copyright © $CompanyName, $year. $RightsStatement Coded by $formattedAuthor on $creationTimestamp"
     } else {
-        $copyrightText = "Copyright © $CompanyName, $year. All Rights Reserved. Created by $formattedAuthor on $creationTimestamp"
+        $copyrightText = "Copyright © $CompanyName, $year. All Rights Reserved. Coded by $formattedAuthor on $creationTimestamp"
     }
     
     # Add edited by info if editor is different from author

@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM Copyright © Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-08
+REM Copyright © Alexander Fields, 2025. All Rights Reserved. Coded by Alexander Fields https://www.alexanderfields.me on 2025-07-08
 REM Run copyright header check locally
 
 REM Get the directory where this script is located

@@ -1,4 +1,4 @@
-# Copyright © Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-02 12:33:32 -->
+# Copyright © Alexander Fields, 2025. All Rights Reserved. Coded by Alexander Fields https://www.alexanderfields.me on 2025-07-02 12:33:32 -->
 # Edited by Alexander Fields https://www.alexanderfields.me 2025-07-02 16:19:52 -->
 name: Reset develop to master
 
@@ -10,9 +10,13 @@ on:
 permissions:
   contents: write   # allows pushing to develop
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   reset-develop:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout all branches
         uses: actions/checkout@v6

@@ -217,27 +217,27 @@ The scripts automatically detect the appropriate comment style based on file ext
 
 ### Output Format
 ```
-// Copyright CompanyName, 2024. All Rights Reserved. Created by John Doe on 2024-01-15 14:30:45
+// Copyright CompanyName, 2024. All Rights Reserved. Coded by John Doe on 2024-01-15 14:30:45
 ```
 
 ### With Custom Rights Statement
 ```
-// Copyright CompanyName, 2024. MIT License Created by John Doe on 2024-01-15 14:30:45
+// Copyright CompanyName, 2024. MIT License Coded by John Doe on 2024-01-15 14:30:45
 ```
 
 ### Special Author Output
 ```
-// Copyright CompanyName, 2024. All Rights Reserved. Created by John Doe https://johndoe.com on 2024-01-15 14:30:45
+// Copyright CompanyName, 2024. All Rights Reserved. Coded by John Doe https://johndoe.com on 2024-01-15 14:30:45
 ```
 
 ### Full Example with Rights Statement
 ```
-// Copyright Perilous Games, Ltd., 2024. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2024-01-15 14:30:45
+// Copyright Perilous Games, Ltd., 2024. All Rights Reserved. Coded by Alexander Fields https://www.alexanderfields.me on 2024-01-15 14:30:45
 ```
 
 ### With Edited By Info
 ```
-// Copyright CompanyName, 2024. All Rights Reserved. Created by John Doe on 2024-01-15 14:30:45
+// Copyright CompanyName, 2024. All Rights Reserved. Coded by John Doe on 2024-01-15 14:30:45
 // Edited by Jane Smith 2024-01-20 09:15:30
 ```
 
@@ -245,7 +245,7 @@ The scripts automatically detect the appropriate comment style based on file ext
 For JSON files, the copyright is added as a property:
 ```json
 {
-  "copyright": "Copyright MyCompany, 2024. All Rights Reserved. Created by John Doe on 2024-01-15 14:30:45",
+  "copyright": "Copyright MyCompany, 2024. All Rights Reserved. Coded by John Doe on 2024-01-15 14:30:45",
   "name": "my-project",
   "version": "1.0.0"
 }
@@ -254,7 +254,7 @@ For JSON files, the copyright is added as a property:
 With edited by info:
 ```json
 {
-  "copyright": "Copyright MyCompany, 2024. All Rights Reserved. Created by John Doe on 2024-01-15 14:30:45, Edited by Jane Smith 2024-01-20 09:15:30",
+  "copyright": "Copyright MyCompany, 2024. All Rights Reserved. Coded by John Doe on 2024-01-15 14:30:45, Edited by Jane Smith 2024-01-20 09:15:30",
   "data": {}
 }
 ```
