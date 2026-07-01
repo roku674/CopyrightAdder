@@ -10,9 +10,13 @@ on:
 permissions:
   contents: write   # allows pushing to develop
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   reset-develop:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout all branches
         uses: actions/checkout@v6
