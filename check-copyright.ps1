@@ -1,4 +1,4 @@
-# Copyright © Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-08
+# Copyright © Alexander Fields, 2025. All Rights Reserved. Coded by Alexander Fields https://www.alexanderfields.me on 2025-07-08
 # Run copyright header check locally
 
 # Get the directory where this script is located

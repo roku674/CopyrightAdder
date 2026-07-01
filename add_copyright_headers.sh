@@ -1,4 +1,4 @@
-# Copyright © Alexander Fields, 2025. All Rights Reserved. Created by Alexander Fields https://www.alexanderfields.me on 2025-07-02 09:35:27
+# Copyright © Alexander Fields, 2025. All Rights Reserved. Coded by Alexander Fields https://www.alexanderfields.me on 2025-07-02 09:35:27
 # Edited by Alexander Fields https://www.alexanderfields.me 2025-07-02 17:25:28
 #!/bin/bash
 
@@ -329,9 +329,9 @@ add_copyright_header() {
     
     # Build the copyright header with creation timestamp from git
     if [ -n "$RIGHTS_STATEMENT" ]; then
-        local copyright_text="Copyright © $COMPANY_NAME, $year. $RIGHTS_STATEMENT Created by $formatted_author on $creation_timestamp"
+        local copyright_text="Copyright © $COMPANY_NAME, $year. $RIGHTS_STATEMENT Coded by $formatted_author on $creation_timestamp"
     else
-        local copyright_text="Copyright © $COMPANY_NAME, $year. All Rights Reserved. Created by $formatted_author on $creation_timestamp"
+        local copyright_text="Copyright © $COMPANY_NAME, $year. All Rights Reserved. Coded by $formatted_author on $creation_timestamp"
     fi
     
     # Build edited by lines for all unique editors

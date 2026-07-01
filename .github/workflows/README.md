@@ -49,7 +49,7 @@ Uses the default `GITHUB_TOKEN` provided by GitHub Actions.
 
 1. **Author Detection**: Uses `git log` to find the original author of each file
 2. **Timestamp**: Uses the file's creation date from git history
-3. **Format**: `Copyright [Company], [Year]. [Rights]. Created by [Author] on [Date]`
+3. **Format**: `Copyright [Company], [Year]. [Rights]. Coded by [Author] on [Date]`
 4. **Updates**: If a header exists, it adds an "Edited by" line instead
 
 ## Customization
