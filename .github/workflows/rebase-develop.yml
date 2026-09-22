@@ -1,0 +1,49 @@
+# Copyright © Alexander Fields, 2025. All Rights Reserved. Coded by Alexander Fields https://www.alexanderfields.me on 2025-07-02 12:33:32 -->
+name: Rebase develop onto master
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write   # allows pushing to develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rebase-develop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout all branches
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: master
+
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Rebase develop onto master
+        run: |
+          if ! git ls-remote --exit-code --heads origin develop; then
+            echo "No develop branch on origin; nothing to rebase."
+            exit 0
+          fi
+          git checkout -B develop origin/develop
+          if ! git rebase origin/master; then
+            git rebase --abort
+            echo "::error::Rebase of develop onto master hit conflicts. Resolve manually."
+            exit 1
+          fi
+
+      - name: Push develop
+        run: |
+          if git rev-parse --verify --quiet develop; then
+            git push origin develop --force-with-lease
+          fi
