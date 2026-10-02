@@ -1,5 +1,5 @@
 # Copyright © Alexander Fields, 2025. All Rights Reserved. Coded by Alexander Fields https://www.alexanderfields.me on 2025-07-02 12:33:32 -->
-name: Rebase develop onto master
+name: Sync develop with master
 
 on:
   push:
@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  rebase-develop:
+  sync-develop:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -29,21 +29,32 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Rebase develop onto master
+      # PRs into master are squash-merged, so rebasing develop replays already-squashed
+      # commits and conflicts. Instead: reset develop when trees match, else merge.
+      - name: Sync develop with master
         run: |
-          if ! git ls-remote --exit-code --heads origin develop; then
-            echo "No develop branch on origin; nothing to rebase."
+          set -euo pipefail
+          if ! git ls-remote --exit-code --heads origin develop >/dev/null; then
+            echo "No develop branch on origin; nothing to sync."
+            exit 0
+          fi
+          git fetch origin develop:refs/remotes/origin/develop --force
+          if git diff --quiet origin/master origin/develop; then
+            lease=$(git rev-parse origin/develop)
+            git push origin origin/master:refs/heads/develop --force-with-lease=develop:$lease
+            echo "Path: reset (trees identical, develop now equals master)"
             exit 0
           fi
           git checkout -B develop origin/develop
-          if ! git rebase origin/master; then
-            git rebase --abort
-            echo "::error::Rebase of develop onto master hit conflicts. Resolve manually."
+          if ! git merge --no-edit -X ours origin/master; then
+            files=$(git diff --name-only --diff-filter=U | tr '\n' ' ')
+            git merge --abort
+            echo "::error::Merge of master into develop failed. Conflicting files: $files"
             exit 1
           fi
-
-      - name: Push develop
-        run: |
-          if git rev-parse --verify --quiet develop; then
-            git push origin develop --force-with-lease
+          if git grep -nE '^(<<<<<<< |>>>>>>> )' -- . >/dev/null; then
+            echo "::error::Conflict markers remain: $(git grep -lE '^(<<<<<<< |>>>>>>> )' -- . | tr '\n' ' ')"
+            exit 1
           fi
+          git push origin develop
+          echo "Path: merge (develop had unmerged work, merged master into it)"
