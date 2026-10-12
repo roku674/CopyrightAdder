@@ -26,3 +26,6 @@ sources.txt
 
 # Copyright adder tool (not a submodule)
 CopyrightAdder/
+
+# Claude global/project instruction files (local only)
+CLAUDE*
