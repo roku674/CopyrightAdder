@@ -46,7 +46,7 @@ jobs:
             exit 0
           fi
           git checkout -B develop origin/develop
-          if ! git merge --no-edit -X ours origin/master; then
+          if ! git merge --no-edit origin/master; then
             files=$(git diff --name-only --diff-filter=U | tr '\n' ' ')
             git merge --abort
             echo "::error::Merge of master into develop failed. Conflicting files: $files"
